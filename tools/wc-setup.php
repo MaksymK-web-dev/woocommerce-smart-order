@@ -21,7 +21,8 @@ declare( strict_types = 1 );
 
 if ( PHP_SAPI !== 'cli' ) {
 	http_response_code( 403 );
-	exit( 'CLI only' );
+	fwrite( STDERR, "CLI only" . PHP_EOL );
+	exit( 1 );
 }
 
 /**
@@ -148,42 +149,35 @@ switch ( $command ) {
 		break;
 
 	case 'order':
-		$note     = $argument;
-		$products = wc_get_products(
-			array(
-				'status' => 'publish',
-				'limit'  => 3,
-			)
-		);
+		$note = $argument;
 
-		if ( ! $products ) {
+		// The factory lives in the plugin so the CLI command and this script cannot drift
+		// apart. Loaded through the autoloader, so it works even when the plugin is
+		// deactivated for testing.
+		if ( ! class_exists( \WSO\SmartOrder\Order\TestOrderFactory::class ) ) {
+			$autoload = WP_PLUGIN_DIR . '/woocommerce-smart-order/autoload.php';
+
+			if ( ! is_readable( $autoload ) ) {
+				fwrite( STDERR, "woocommerce-smart-order plugin not found.\n" );
+				exit( 1 );
+			}
+
+			require_once $autoload;
+		}
+
+		$order_id = ( new \WSO\SmartOrder\Order\TestOrderFactory() )->create( $note );
+
+		if ( null === $order_id ) {
 			fwrite( STDERR, "No published products.\n" );
 			exit( 1 );
 		}
 
-		$order = wc_create_order();
-		foreach ( array_slice( $products, 0, 2 ) as $index => $product ) {
-			$order->add_product( $product, 0 === $index ? 2 : 1 );
+		$order = wc_get_order( $order_id );
+
+		if ( ! $order instanceof \WC_Order ) {
+			fwrite( STDERR, "Order {$order_id} could not be read back.\n" );
+			exit( 1 );
 		}
-
-		$order->set_address(
-			array(
-				'first_name' => 'Іван',
-				'last_name'  => 'Петренко',
-				'phone'      => '+000000000000',
-				'email'      => 'ivan.petrenko@example.com',
-				'address_1'  => 'вул. Городоцька, 12',
-				'city'       => 'Львів',
-				'postcode'   => '79000',
-				'country'    => 'UA',
-			),
-			'billing'
-		);
-
-		$order->set_customer_note( $note );
-		$order->calculate_totals();
-		$order->set_status( 'pending' );
-		$order->save();
 
 		printf(
 			"Order #%s (id=%d), total %s %s, comment: %s\n",

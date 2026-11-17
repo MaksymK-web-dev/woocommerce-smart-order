@@ -15,13 +15,25 @@ use WSO\SmartOrder\Contract\HookRegistrar;
 /**
  * WooCommerce → Smart Order settings page built on the Settings API.
  *
- * Secrets are never rendered: keys come from wp-config.php constants, and if the option
- * fallback is used the field renders empty so a stored value cannot be read back from
+ * Secrets are never printed: keys come from wp-config.php constants, and when the option
+ * fallback is used the field renders empty, so a stored value cannot be read back from
  * the screen.
+ *
+ * Every method here follows one shape: decide first, print second. The render helpers
+ * return finished, escaped strings; nothing that makes a decision runs while output is
+ * being written.
  */
 final class SettingsPage implements HookRegistrar {
 
+	/**
+	 * Menu slug, also used as the Settings API option group.
+	 */
 	private const SLUG = 'wso-smart-order';
+
+	/**
+	 * Capability required to view and save the settings.
+	 */
+	private const CAPABILITY = 'manage_woocommerce';
 
 	/**
 	 * Attaches the admin hooks.
@@ -29,17 +41,33 @@ final class SettingsPage implements HookRegistrar {
 	public function register(): void {
 		add_action( 'admin_menu', array( $this, 'addMenu' ) );
 		add_action( 'admin_init', array( $this, 'registerSettings' ) );
+		// options.php defaults to `manage_options` for every option group. Without this
+		// filter a shop manager, who has `manage_woocommerce` but not `manage_options`,
+		// can open the screen and is then refused with a 403 on save.
+		add_filter( 'option_page_capability_' . self::SLUG, array( $this, 'optionPageCapability' ) );
+	}
+
+	/**
+	 * Allows shop managers to save the page.
+	 *
+	 * @return string Capability name.
+	 */
+	public function optionPageCapability(): string {
+		return self::CAPABILITY;
 	}
 
 	/**
 	 * Adds the submenu entry under WooCommerce.
 	 */
 	public function addMenu(): void {
+		$page_title = __( 'Smart Order', 'woocommerce-smart-order' );
+		$menu_title = __( 'Smart Order', 'woocommerce-smart-order' );
+
 		add_submenu_page(
 			'woocommerce',
-			__( 'Smart Order', 'woocommerce-smart-order' ),
-			__( 'Smart Order', 'woocommerce-smart-order' ),
-			'manage_woocommerce',
+			$page_title,
+			$menu_title,
+			self::CAPABILITY,
 			self::SLUG,
 			array( $this, 'render' )
 		);
@@ -62,12 +90,7 @@ final class SettingsPage implements HookRegistrar {
 		add_settings_section(
 			'wso_main',
 			__( 'Order processing', 'woocommerce-smart-order' ),
-			static function (): void {
-				echo '<p>' . esc_html__(
-					'When a new order arrives, its customer comment is classified for delivery-time requests and the manager is notified.',
-					'woocommerce-smart-order'
-				) . '</p>';
-			},
+			array( $this, 'renderSection' ),
 			self::SLUG
 		);
 
@@ -81,53 +104,105 @@ final class SettingsPage implements HookRegistrar {
 	}
 
 	/**
+	 * Prints the section description.
+	 */
+	public function renderSection(): void {
+		echo '<p>' . esc_html__( 'When a new order arrives, its customer comment is classified for delivery-time requests and the manager is notified.', 'woocommerce-smart-order' ) . '</p>';
+	}
+
+	/**
 	 * Sanitizes the submitted option array.
 	 *
-	 * @param mixed $input Raw input.
+	 * @param mixed $input Raw input from options.php.
 	 * @return array<string, mixed>
 	 */
 	public function sanitize( mixed $input ): array {
 		$input   = is_array( $input ) ? $input : array();
 		$current = Settings::all();
 
+		$provider = isset( $input['provider'] ) && is_scalar( $input['provider'] )
+			? (string) $input['provider']
+			: '';
+
+		$notify_mode = isset( $input['notify_mode'] ) && is_scalar( $input['notify_mode'] )
+			? (string) $input['notify_mode']
+			: '';
+
+		$api_key = isset( $input['api_key'] ) && is_scalar( $input['api_key'] )
+			? trim( (string) $input['api_key'] )
+			: '';
+
+		$telegram_token = isset( $input['telegram_token'] ) && is_scalar( $input['telegram_token'] )
+			? trim( (string) $input['telegram_token'] )
+			: '';
+
+		$telegram_chat = isset( $input['telegram_chat'] ) && is_scalar( $input['telegram_chat'] )
+			? trim( (string) $input['telegram_chat'] )
+			: '';
+
 		$clean = array(
 			'enabled'        => ! empty( $input['enabled'] ),
-			'provider'       => in_array( $input['provider'] ?? '', array( Settings::PROVIDER_OPENAI, Settings::PROVIDER_ANTHROPIC ), true )
-				? (string) $input['provider']
+			'provider'       => in_array( $provider, array( Settings::PROVIDER_OPENAI, Settings::PROVIDER_ANTHROPIC ), true )
+				? $provider
 				: Settings::PROVIDER_OPENAI,
 			'model'          => sanitize_text_field( (string) ( $input['model'] ?? '' ) ),
-			'notify_mode'    => Settings::MODE_TELEGRAM === ( $input['notify_mode'] ?? '' )
+			'notify_mode'    => Settings::MODE_TELEGRAM === $notify_mode
 				? Settings::MODE_TELEGRAM
 				: Settings::MODE_LOG,
-			'telegram_chat'  => sanitize_text_field( (string) ( $input['telegram_chat'] ?? '' ) ),
-			'api_key'        => '' !== (string) ( $input['api_key'] ?? '' )
-				? sanitize_text_field( (string) $input['api_key'] )
+			// A Telegram chat is a numeric id (negative for groups) or a public @username.
+			'telegram_chat'  => $this->sanitizeChatId( $telegram_chat ),
+			// Empty means "keep what is stored" — the field is never prefilled.
+			'api_key'        => '' !== $api_key
+				? sanitize_text_field( $api_key )
 				: (string) ( $current['api_key'] ?? '' ),
-			'telegram_token' => '' !== (string) ( $input['telegram_token'] ?? '' )
-				? sanitize_text_field( (string) $input['telegram_token'] )
+			'telegram_token' => '' !== $telegram_token
+				? sanitize_text_field( $telegram_token )
 				: (string) ( $current['telegram_token'] ?? '' ),
 		);
 
-		if ( ! array_key_exists( 'api_key', $input ) && array_key_exists( 'api_key', $current ) ) {
-			$clean['api_key'] = $current['api_key'];
+		if ( ! array_key_exists( 'model', $input ) && array_key_exists( 'model', $current ) ) {
+			$clean['model'] = (string) $current['model'];
 		}
 
 		return $clean;
 	}
 
 	/**
+	 * Accepts a group id (negative number), a user id (number) or an @channel name.
+	 *
+	 * Anything else is dropped rather than stored and rejected later at send time.
+	 *
+	 * @param string $value Raw value.
+	 */
+	private function sanitizeChatId( string $value ): string {
+		if ( preg_match( '/^-?\d{1,20}$/', $value ) ) {
+			return $value;
+		}
+
+		if ( preg_match( '/^@[A-Za-z][A-Za-z0-9_]{4,31}$/', $value ) ) {
+			return $value;
+		}
+
+		return '';
+	}
+
+	/**
 	 * Renders the page.
 	 */
 	public function render(): void {
-		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+		if ( ! current_user_can( self::CAPABILITY ) ) {
 			return;
 		}
 
-		echo '<div class="wrap"><h1>' . esc_html__( 'Smart Order', 'woocommerce-smart-order' ) . '</h1>';
+		$title = esc_html__( 'Smart Order', 'woocommerce-smart-order' );
+
+		echo '<div class="wrap"><h1>' . $title . '</h1>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped above.
 		echo '<form method="post" action="options.php">';
+
 		settings_fields( self::SLUG );
 		do_settings_sections( self::SLUG );
 		submit_button();
+
 		echo '</form></div>';
 	}
 
@@ -142,78 +217,103 @@ final class SettingsPage implements HookRegistrar {
 		add_settings_field(
 			'wso_' . $key,
 			$label,
-			fn () => $this->renderField( $key, $type ),
+			function () use ( $key, $type ): void {
+				echo $this->buildControl( $key, $type ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built and escaped in buildControl().
+			},
 			self::SLUG,
 			'wso_main'
 		);
 	}
 
 	/**
-	 * Renders one control.
+	 * Builds the escaped markup for one control.
 	 *
 	 * @param string $key  Option key.
 	 * @param string $type Renderer type.
 	 */
-	private function renderField( string $key, string $type ): void {
+	private function buildControl( string $key, string $type ): string {
 		$settings = Settings::all();
 		$name     = sprintf( '%s[%s]', Settings::OPTION, $key );
+		$current  = $settings[ $key ] ?? '';
 
 		switch ( $type ) {
 			case 'checkbox':
-				printf(
-					'<label><input type="checkbox" name="%s" value="1" %s> %s</label>',
-					esc_attr( $name ),
-					checked( (bool) ( $settings[ $key ] ?? false ), true, false ),
-					esc_html__( 'Run the pipeline for every new order', 'woocommerce-smart-order' )
-				);
-				break;
+				return $this->checkbox( $name, (bool) $current );
 
 			case 'select':
-				printf( '<select name="%s">', esc_attr( $name ) );
-				foreach ( array(
-					Settings::PROVIDER_OPENAI    => 'OpenAI',
-					Settings::PROVIDER_ANTHROPIC => 'Anthropic',
-				) as $value => $text ) {
-					printf(
-						'<option value="%s" %s>%s</option>',
-						esc_attr( $value ),
-						selected( (string) ( $settings[ $key ] ?? '' ), $value, false ),
-						esc_html( $text )
-					);
-				}
-				echo '</select>';
-				break;
+				return $this->select(
+					$name,
+					(string) $current,
+					array(
+						Settings::PROVIDER_OPENAI    => 'OpenAI',
+						Settings::PROVIDER_ANTHROPIC => 'Anthropic',
+					)
+				);
 
 			case 'select_notify':
-				printf( '<select name="%s">', esc_attr( $name ) );
-				foreach ( array(
-					Settings::MODE_LOG      => __( 'Log only (no credentials needed)', 'woocommerce-smart-order' ),
-					Settings::MODE_TELEGRAM => __( 'Telegram', 'woocommerce-smart-order' ),
-				) as $value => $text ) {
-					printf(
-						'<option value="%s" %s>%s</option>',
-						esc_attr( $value ),
-						selected( (string) ( $settings[ $key ] ?? '' ), $value, false ),
-						esc_html( $text )
-					);
-				}
-				echo '</select>';
-				break;
+				return $this->select(
+					$name,
+					(string) $current,
+					array(
+						Settings::MODE_LOG      => __( 'Log only (no credentials needed)', 'woocommerce-smart-order' ),
+						Settings::MODE_TELEGRAM => __( 'Telegram', 'woocommerce-smart-order' ),
+					)
+				);
 
 			case 'password':
-				printf(
+				return sprintf(
 					'<input type="password" name="%s" value="" autocomplete="new-password" class="regular-text" placeholder="%s">',
 					esc_attr( $name ),
 					esc_attr__( 'leave empty to keep the stored value', 'woocommerce-smart-order' )
 				);
-				break;
 
 			default:
-				printf(
+				return sprintf(
 					'<input type="text" name="%s" value="%s" class="regular-text">',
 					esc_attr( $name ),
-					esc_attr( (string) ( $settings[ $key ] ?? '' ) )
+					esc_attr( (string) $current )
 				);
 		}
+	}
+
+	/**
+	 * Builds a checkbox control.
+	 *
+	 * @param string $name    Field name.
+	 * @param bool   $checked Current state.
+	 */
+	private function checkbox( string $name, bool $checked ): string {
+		$checked_attribute = $checked ? ' checked="checked"' : '';
+		$label             = esc_html__( 'Run the pipeline for every new order', 'woocommerce-smart-order' );
+
+		return sprintf(
+			'<label><input type="checkbox" name="%s" value="1"%s> %s</label>',
+			esc_attr( $name ),
+			$checked_attribute,
+			$label
+		);
+	}
+
+	/**
+	 * Builds a select control.
+	 *
+	 * @param string                $name    Field name.
+	 * @param string                $current Current value.
+	 * @param array<string, string> $choices Value => label pairs.
+	 */
+	private function select( string $name, string $current, array $choices ): string {
+		$options = '';
+
+		foreach ( $choices as $value => $label ) {
+			$selected = $value === $current ? ' selected="selected"' : '';
+			$options .= sprintf(
+				'<option value="%s"%s>%s</option>',
+				esc_attr( (string) $value ),
+				$selected,
+				esc_html( $label )
+			);
+		}
+
+		return sprintf( '<select name="%s">%s</select>', esc_attr( $name ), $options );
 	}
 }

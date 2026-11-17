@@ -28,7 +28,9 @@ declare( strict_types = 1 );
 
 namespace WSO\Transport;
 
-defined( 'ABSPATH' ) || exit;
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
 
 /**
  * Grants wp_safe_remote_request() access to the local n8n webhook endpoint.

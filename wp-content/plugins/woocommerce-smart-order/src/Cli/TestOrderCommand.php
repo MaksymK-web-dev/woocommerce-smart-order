@@ -14,13 +14,15 @@ use WSO\SmartOrder\Config\Settings;
 use WSO\SmartOrder\Notify\NotifierFactory;
 use WSO\SmartOrder\Order\PayloadFactory;
 use WSO\SmartOrder\Order\Pipeline;
+use WSO\SmartOrder\Order\TestOrderFactory;
 use WSO\SmartOrder\Support\MessageFormatter;
 
 /**
  * Exercises the pipeline from the command line.
  *
- * `wp smart-order test "comment"` creates a real order and runs the real pipeline, so the
- * full path is verifiable without logging into wp-admin.
+ * `wp smart-order test "comment"` creates a real order through the same factory the demo
+ * script uses and runs the real pipeline, so the full path is verifiable without logging
+ * into wp-admin.
  */
 final class TestOrderCommand {
 
@@ -46,31 +48,28 @@ final class TestOrderCommand {
 	 *
 	 *     wp smart-order test "Доставка після 18:00, зателефонувати за годину"
 	 *
-	 * @param array<int, string>    $args       Positional arguments.
-	 * @param array<string, string> $assocArgs  Flags.
+	 * @param array<int, string>    $args      Positional arguments.
+	 * @param array<string, string> $assocArgs Flags.
 	 */
 	public function test( array $args, array $assocArgs ): void {
-		$comment = (string) ( $args[0] ?? '' );
+		$comment = isset( $args[0] ) && is_scalar( $args[0] ) ? trim( (string) $args[0] ) : '';
 
 		if ( '' === $comment ) {
 			\WP_CLI::error( 'A comment is required.' );
 		}
 
 		if ( isset( $assocArgs['dry-run'] ) ) {
-			$result = ( new ClassifierFactory() )->make()->classify( $comment );
-			\WP_CLI::line(
-				sprintf(
-					'urgent=%s available=%s note=%s',
-					$result->urgent ? 'true' : 'false',
-					$result->available ? 'true' : 'false',
-					'' !== $result->note ? $result->note : ( '' !== $result->error ? '(' . $result->error . ')' : '—' )
-				)
-			);
+			$this->printClassification( $comment );
 
 			return;
 		}
 
-		$orderId = $this->createOrder( $comment );
+		$orderId = ( new TestOrderFactory() )->create( $comment );
+
+		if ( null === $orderId ) {
+			\WP_CLI::error( 'No published products to build an order from.' );
+		}
+
 		\WP_CLI::line( sprintf( 'Created order %d.', $orderId ) );
 
 		$pipeline = new Pipeline(
@@ -81,57 +80,42 @@ final class TestOrderCommand {
 
 		$sent = $pipeline->process( $orderId );
 
-		$sent
-			? \WP_CLI::success( 'Pipeline processed the order.' )
-			: \WP_CLI::warning( 'Pipeline ran but no notification was delivered.' );
+		if ( $sent ) {
+			\WP_CLI::success( 'Pipeline processed the order.' );
+		} else {
+			\WP_CLI::warning( 'Pipeline ran but no notification was delivered.' );
+		}
 
 		if ( ! Settings::enabled() ) {
-			\WP_CLI::warning( 'Processing is disabled in settings — trigger through the hook will not run.' );
+			\WP_CLI::warning( 'Processing is disabled in settings — the hook will not run.' );
 		}
 	}
 
 	/**
-	 * Creates a minimal order with two products and the given customer comment.
+	 * Classifies a comment and prints the result, without touching any order.
 	 *
 	 * @param string $comment Customer comment.
 	 */
-	private function createOrder( string $comment ): int {
-		$products = wc_get_products(
-			array(
-				'status' => 'publish',
-				'limit'  => 2,
+	private function printClassification( string $comment ): void {
+		$result = ( new ClassifierFactory() )->make()->classify( $comment );
+
+		$note = $result->note;
+
+		if ( '' === $note && '' !== $result->error ) {
+			$note = '(' . $result->error . ')';
+		}
+
+		if ( '' === $note ) {
+			$note = '—';
+		}
+
+		\WP_CLI::line(
+			sprintf(
+				'urgent=%s available=%s note=%s',
+				$result->urgent ? 'true' : 'false',
+				$result->available ? 'true' : 'false',
+				$note
 			)
 		);
-
-		if ( ! $products ) {
-			\WP_CLI::error( 'No published products to build an order from.' );
-		}
-
-		$order = wc_create_order();
-
-		foreach ( $products as $product ) {
-			$order->add_product( $product, 1 );
-		}
-
-		$order->set_address(
-			array(
-				'first_name' => 'Іван',
-				'last_name'  => 'Петренко',
-				'phone'      => '+000000000000',
-				'email'      => 'ivan.petrenko@example.com',
-				'address_1'  => 'вул. Городоцька, 12',
-				'city'       => 'Львів',
-				'postcode'   => '79000',
-				'country'    => 'UA',
-			),
-			'billing'
-		);
-
-		$order->set_customer_note( $comment );
-		$order->calculate_totals();
-		$order->set_status( 'pending' );
-		$order->save();
-
-		return $order->get_id();
 	}
 }

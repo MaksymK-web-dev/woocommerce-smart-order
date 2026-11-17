@@ -20,7 +20,9 @@ declare( strict_types = 1 );
 
 namespace WSO\SmartOrder;
 
-defined( 'ABSPATH' ) || exit;
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
 
 define( 'WSO_SMART_ORDER_FILE', __FILE__ );
 define( 'WSO_SMART_ORDER_DIR', __DIR__ );
