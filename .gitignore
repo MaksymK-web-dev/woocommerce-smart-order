@@ -14,11 +14,25 @@
 # ─── Project artifacts ──────────────────────────────────────────────
 !/.gitignore
 !/.gitattributes
+!/.editorconfig
 !/.env.example
+!/LICENSE
 !/README.md
+!/CHANGELOG.md
+!/composer.json
+!/composer.lock
+!/phpcs.xml.dist
+!/phpunit.xml.dist
+!/.github/
+!/tests/
 !/n8n/
 !/tools/
 !/scripts/
+
+# ─── Dev dependencies and caches ────────────────────────────────────
+/vendor/
+/.phpunit.cache/
+/.phpcs.cache
 
 # ─── Our own WordPress code only ────────────────────────────────────
 !/wp-content/

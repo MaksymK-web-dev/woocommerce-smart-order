@@ -1,0 +1,68 @@
+<?xml version="1.0"?>
+<ruleset name="WooCommerce Smart Order">
+	<description>Coding standard for the Smart Order plugin: WordPress rules, adapted to PSR-4 class files and modern PHP.</description>
+
+	<file>wp-content/plugins/woocommerce-smart-order</file>
+	<file>wp-content/mu-plugins</file>
+
+	<exclude-pattern>*/vendor/*</exclude-pattern>
+	<exclude-pattern>*/node_modules/*</exclude-pattern>
+	<exclude-pattern>*/tests/*</exclude-pattern>
+
+	<arg name="extensions" value="php"/>
+	<arg name="colors"/>
+	<arg name="basepath" value="."/>
+	<arg value="ps"/>
+
+	<config name="minimum_supported_wp_version" value="6.4"/>
+	<config name="testVersion" value="8.1-"/>
+
+	<rule ref="WordPress">
+		<!--
+			PSR-4 file naming: one class per file, named after the class. WordPress
+			convention (class-foo.php) contradicts it, and the project chose PSR-4.
+		-->
+		<exclude name="WordPress.Files.FileName"/>
+		<!-- camelCase methods and properties are the project convention (PSR-4 code). -->
+		<exclude name="WordPress.NamingConventions.ValidVariableName"/>
+		<exclude name="WordPress.NamingConventions.ValidFunctionName"/>
+		<!-- Yoda conditions are a WordPress style choice; this project writes natural order. -->
+		<exclude name="WordPress.PHP.YodaConditions"/>
+		<!-- Rule is aimed at themes; the plugin ships no templates. -->
+		<exclude name="WordPress.WP.GlobalVariablesOverride"/>
+		<!--
+			The PSR-4 namespace is WSO\SmartOrder. PrefixAllGlobals asks namespaces to
+			start with a registered prefix, which would force a longer vendor name.
+		-->
+		<exclude name="WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedNamespaceFound"/>
+	</rule>
+
+	<rule ref="WordPress-Extra"/>
+
+	<rule ref="PHPCompatibilityWP"/>
+
+	<rule ref="WordPress.WP.Capabilities">
+		<properties>
+			<property name="custom_capabilities" type="array">
+				<element value="manage_woocommerce"/>
+			</property>
+		</properties>
+	</rule>
+
+	<rule ref="WordPress.WP.I18n">
+		<properties>
+			<property name="text_domain" type="array">
+				<element value="woocommerce-smart-order"/>
+			</property>
+		</properties>
+	</rule>
+
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+		<properties>
+			<property name="prefixes" type="array">
+				<element value="wso_smart_order"/>
+				<element value="WSO_SMART_ORDER"/>
+			</property>
+		</properties>
+	</rule>
+</ruleset>

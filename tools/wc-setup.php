@@ -30,7 +30,7 @@ if ( PHP_SAPI !== 'cli' ) {
  * @param string[] $argv Raw arguments.
  * @return string Absolute path to wp-load.php.
  */
-function wso_locate_wp_root( array $argv ): string {
+function wso_smart_order_locate_wp_root( array $argv ): string {
 	$root = getenv( 'WSO_WP_ROOT' ) ?: '';
 
 	foreach ( $argv as $arg ) {
@@ -57,9 +57,9 @@ function wso_locate_wp_root( array $argv ): string {
 	exit( 1 );
 }
 
-require_once wso_locate_wp_root( $argv );
+require_once wso_smart_order_locate_wp_root( $argv );
 
-$command = $argv[1] ?? 'help';
+$command  = $argv[1] ?? 'help';
 $argument = $argv[2] ?? '';
 
 if ( ! class_exists( 'WC_Webhook' ) ) {
@@ -74,7 +74,7 @@ if ( ! class_exists( 'WC_Webhook' ) ) {
  *
  * @return WC_Webhook[]
  */
-function wso_all_webhooks(): array {
+function wso_smart_order_all_webhooks(): array {
 	$store = WC_Data_Store::load( 'webhook' );
 	$hooks = array();
 
@@ -96,7 +96,7 @@ switch ( $command ) {
 		}
 
 		$webhook = null;
-		foreach ( wso_all_webhooks() as $existing ) {
+		foreach ( wso_smart_order_all_webhooks() as $existing ) {
 			if ( $existing->get_delivery_url() === $argument ) {
 				$webhook = $existing;
 				break;
@@ -130,7 +130,7 @@ switch ( $command ) {
 		break;
 
 	case 'list':
-		$hooks = wso_all_webhooks();
+		$hooks = wso_smart_order_all_webhooks();
 		if ( ! $hooks ) {
 			echo "No webhooks.\n";
 			break;
@@ -148,7 +148,7 @@ switch ( $command ) {
 		break;
 
 	case 'order':
-		$note = $argument;
+		$note     = $argument;
 		$products = wc_get_products(
 			array(
 				'status' => 'publish',

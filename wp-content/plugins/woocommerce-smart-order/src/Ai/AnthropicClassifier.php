@@ -25,6 +25,8 @@ final class AnthropicClassifier implements Classifier {
 	private const API_VERSION = '2023-06-01';
 
 	/**
+	 * Sets up the adapter.
+	 *
 	 * @param string $apiKey API key.
 	 * @param string $model  Model name.
 	 */
@@ -34,7 +36,9 @@ final class AnthropicClassifier implements Classifier {
 	) {}
 
 	/**
-	 * {@inheritDoc}
+	 * Classifies a comment through Anthropic.
+	 *
+	 * @param string $comment Customer comment.
 	 */
 	public function classify( string $comment ): UrgencyResult {
 		if ( '' === $this->apiKey ) {
@@ -52,12 +56,12 @@ final class AnthropicClassifier implements Classifier {
 				),
 				'body'    => wp_json_encode(
 					array(
-						'model'         => $this->model,
-						'max_tokens'    => 256,
-						'temperature'   => 0,
+						'model'       => $this->model,
+						'max_tokens'  => 256,
+						'temperature' => 0,
 						// Prefilling the assistant turn with "{" makes the model continue a
 						// JSON object instead of opening with prose.
-						'messages'      => array(
+						'messages'    => array(
 							array(
 								'role'    => 'user',
 								'content' => Prompt::system() . "\n\n" . Prompt::user( $comment ),

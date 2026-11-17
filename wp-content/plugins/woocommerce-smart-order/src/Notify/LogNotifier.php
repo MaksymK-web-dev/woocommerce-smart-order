@@ -24,12 +24,17 @@ use WSO\SmartOrder\Support\MessageFormatter;
 final class LogNotifier implements Notifier {
 
 	/**
+	 * Sets up the notifier.
+	 *
 	 * @param MessageFormatter $formatter Message builder.
 	 */
 	public function __construct( private readonly MessageFormatter $formatter ) {}
 
 	/**
-	 * {@inheritDoc}
+	 * Writes the message to the WooCommerce log.
+	 *
+	 * @param OrderPayload  $payload Order data.
+	 * @param UrgencyResult $urgency Classification result.
 	 */
 	public function send( OrderPayload $payload, UrgencyResult $urgency ): bool {
 		Logger::debug(

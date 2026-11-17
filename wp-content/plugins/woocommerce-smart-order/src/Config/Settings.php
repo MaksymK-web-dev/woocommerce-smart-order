@@ -35,10 +35,10 @@ final class Settings {
 
 		return array_merge(
 			array(
-				'enabled'      => false,
-				'provider'     => self::PROVIDER_OPENAI,
-				'model'        => 'gpt-4o-mini',
-				'notify_mode'  => self::MODE_LOG,
+				'enabled'       => false,
+				'provider'      => self::PROVIDER_OPENAI,
+				'model'         => 'gpt-4o-mini',
+				'notify_mode'   => self::MODE_LOG,
 				'telegram_chat' => '',
 			),
 			is_array( $stored ) ? $stored : array()

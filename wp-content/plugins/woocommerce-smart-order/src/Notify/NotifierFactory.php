@@ -20,6 +20,8 @@ use WSO\SmartOrder\Support\MessageFormatter;
 final class NotifierFactory {
 
 	/**
+	 * Sets up the factory.
+	 *
 	 * @param MessageFormatter $formatter Message builder.
 	 */
 	public function __construct( private readonly MessageFormatter $formatter ) {}

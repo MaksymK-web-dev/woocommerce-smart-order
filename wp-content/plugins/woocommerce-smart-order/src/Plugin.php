@@ -30,11 +30,15 @@ final class Plugin {
 
 	/**
 	 * Singleton instance.
+	 *
+	 * @var self|null
 	 */
 	private static ?self $instance = null;
 
 	/**
 	 * Whether boot() already ran.
+	 *
+	 * @var bool
 	 */
 	private bool $booted = false;
 
@@ -62,7 +66,11 @@ final class Plugin {
 			( new NotifierFactory( $formatter ) )->make()
 		);
 
-		/** @var HookRegistrar[] $registrars */
+		/**
+		 * Every hook owner, in boot order.
+		 *
+		 * @var HookRegistrar[]
+		 */
 		$registrars = array(
 			new OrderListener( $pipeline, static fn (): bool => Settings::enabled() ),
 			new SettingsPage(),

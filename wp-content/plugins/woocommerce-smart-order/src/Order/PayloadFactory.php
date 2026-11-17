@@ -32,7 +32,7 @@ final class PayloadFactory {
 	 * @param \WC_Order $order Order.
 	 */
 	public function fromOrder( \WC_Order $order ): OrderPayload {
-		$name = trim( $order->get_formatted_billing_full_name() );
+		$name  = trim( $order->get_formatted_billing_full_name() );
 		$phone = trim( (string) $order->get_billing_phone() );
 
 		return new OrderPayload(
@@ -48,7 +48,9 @@ final class PayloadFactory {
 	}
 
 	/**
-	 * "Shirt (x2), Cap (x1)" — or an em dash for an empty order.
+	 * Builds the human-readable item list.
+	 *
+	 * @param \WC_Order $order Order.
 	 */
 	private function itemList( \WC_Order $order ): string {
 		$parts = array();
@@ -65,7 +67,9 @@ final class PayloadFactory {
 	}
 
 	/**
-	 * Total formatted with the order currency.
+	 * Formats the order total with its currency.
+	 *
+	 * @param \WC_Order $order Order.
 	 */
 	private function formatTotal( \WC_Order $order ): string {
 		$total = $order->get_total();

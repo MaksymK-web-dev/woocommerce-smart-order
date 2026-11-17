@@ -24,7 +24,7 @@ final class SettingsPage implements HookRegistrar {
 	private const SLUG = 'wso-smart-order';
 
 	/**
-	 * {@inheritDoc}
+	 * Attaches the admin hooks.
 	 */
 	public function register(): void {
 		add_action( 'admin_menu', array( $this, 'addMenu' ) );
@@ -91,16 +91,16 @@ final class SettingsPage implements HookRegistrar {
 		$current = Settings::all();
 
 		$clean = array(
-			'enabled'       => ! empty( $input['enabled'] ),
-			'provider'      => in_array( $input['provider'] ?? '', array( Settings::PROVIDER_OPENAI, Settings::PROVIDER_ANTHROPIC ), true )
+			'enabled'        => ! empty( $input['enabled'] ),
+			'provider'       => in_array( $input['provider'] ?? '', array( Settings::PROVIDER_OPENAI, Settings::PROVIDER_ANTHROPIC ), true )
 				? (string) $input['provider']
 				: Settings::PROVIDER_OPENAI,
-			'model'         => sanitize_text_field( (string) ( $input['model'] ?? '' ) ),
-			'notify_mode'   => Settings::MODE_TELEGRAM === ( $input['notify_mode'] ?? '' )
+			'model'          => sanitize_text_field( (string) ( $input['model'] ?? '' ) ),
+			'notify_mode'    => Settings::MODE_TELEGRAM === ( $input['notify_mode'] ?? '' )
 				? Settings::MODE_TELEGRAM
 				: Settings::MODE_LOG,
-			'telegram_chat' => sanitize_text_field( (string) ( $input['telegram_chat'] ?? '' ) ),
-			'api_key'       => '' !== (string) ( $input['api_key'] ?? '' )
+			'telegram_chat'  => sanitize_text_field( (string) ( $input['telegram_chat'] ?? '' ) ),
+			'api_key'        => '' !== (string) ( $input['api_key'] ?? '' )
 				? sanitize_text_field( (string) $input['api_key'] )
 				: (string) ( $current['api_key'] ?? '' ),
 			'telegram_token' => '' !== (string) ( $input['telegram_token'] ?? '' )

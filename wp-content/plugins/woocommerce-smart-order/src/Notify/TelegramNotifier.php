@@ -21,9 +21,11 @@ use WSO\SmartOrder\Support\MessageFormatter;
 final class TelegramNotifier implements Notifier {
 
 	/**
-	 * @param string            $token     Bot token.
-	 * @param string            $chatId    Target group id.
-	 * @param MessageFormatter  $formatter Message builder.
+	 * Sets up the notifier.
+	 *
+	 * @param string           $token     Bot token.
+	 * @param string           $chatId    Target group id.
+	 * @param MessageFormatter $formatter Message builder.
 	 */
 	public function __construct(
 		private readonly string $token,
@@ -32,7 +34,10 @@ final class TelegramNotifier implements Notifier {
 	) {}
 
 	/**
-	 * {@inheritDoc}
+	 * Posts the message to the configured group.
+	 *
+	 * @param OrderPayload  $payload Order data.
+	 * @param UrgencyResult $urgency Classification result.
 	 */
 	public function send( OrderPayload $payload, UrgencyResult $urgency ): bool {
 		if ( '' === $this->token || '' === $this->chatId ) {

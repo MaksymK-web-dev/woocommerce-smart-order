@@ -20,6 +20,8 @@ final class OpenAiClassifier implements Classifier {
 	private const ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 
 	/**
+	 * Sets up the adapter.
+	 *
 	 * @param string $apiKey API key.
 	 * @param string $model  Model name.
 	 */
@@ -29,7 +31,9 @@ final class OpenAiClassifier implements Classifier {
 	) {}
 
 	/**
-	 * {@inheritDoc}
+	 * Classifies a comment through OpenAI.
+	 *
+	 * @param string $comment Customer comment.
 	 */
 	public function classify( string $comment ): UrgencyResult {
 		if ( '' === $this->apiKey ) {

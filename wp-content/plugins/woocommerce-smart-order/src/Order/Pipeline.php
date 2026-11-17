@@ -23,6 +23,8 @@ use WSO\SmartOrder\Support\Logger;
 final class Pipeline {
 
 	/**
+	 * Sets up the pipeline.
+	 *
 	 * @param PayloadFactory $payloads  Order reader.
 	 * @param Classifier     $classifier AI adapter.
 	 * @param Notifier       $notifier   Transport.

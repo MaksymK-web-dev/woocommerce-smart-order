@@ -18,6 +18,8 @@ namespace WSO\SmartOrder\Order;
 final class OrderPayload {
 
 	/**
+	 * Creates the payload.
+	 *
 	 * @param string $orderNumber Human-facing order number.
 	 * @param int    $orderId     Internal order id.
 	 * @param string $customer    Full name, or a placeholder.

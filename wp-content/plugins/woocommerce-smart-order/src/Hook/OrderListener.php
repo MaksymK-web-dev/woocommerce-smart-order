@@ -29,26 +29,32 @@ final class OrderListener implements HookRegistrar {
 	/**
 	 * Order ids collected during this request.
 	 *
+	 * Order ids collected during this request.
+	 *
 	 * @var array<int, bool>
 	 */
 	private array $pending = array();
 
 	/**
 	 * Whether the shutdown callback is attached.
+	 *
+	 * @var bool
 	 */
 	private bool $shutdownRegistered = false;
 
 	/**
+	 * Sets up the listener.
+	 *
 	 * @param Pipeline $pipeline  Order pipeline.
-	 * @param callable $isEnabled Returns whether the plugin should act at all.
+	 * @param \Closure $isEnabled Returns whether the plugin should act at all.
 	 */
 	public function __construct(
 		private readonly Pipeline $pipeline,
-		private readonly mixed $isEnabled
+		private readonly \Closure $isEnabled
 	) {}
 
 	/**
-	 * {@inheritDoc}
+	 * Attaches the new-order hook.
 	 */
 	public function register(): void {
 		add_action( 'woocommerce_new_order', array( $this, 'collect' ), 20, 1 );

@@ -18,6 +18,8 @@ namespace WSO\SmartOrder\Ai;
 final class UrgencyResult {
 
 	/**
+	 * Keeps construction behind the named constructors below.
+	 *
 	 * @param bool   $urgent      Whether the comment carries a delivery-time request.
 	 * @param string $note        Short restatement of the request, in the customer's language.
 	 * @param bool   $available   False when the classifier could not run or returned garbage.

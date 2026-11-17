@@ -223,6 +223,6 @@ const workflow = {
   settings: { executionOrder: 'v1' },
 };
 
-const out = join(here, 'wc-smart-order.workflow.json');
+const out = join(here, 'workflow.json');
 writeFileSync(out, JSON.stringify(workflow, null, 2) + '\n', 'utf8');
 console.log('written:', out);
