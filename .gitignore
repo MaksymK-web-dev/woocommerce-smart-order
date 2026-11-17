@@ -4,52 +4,49 @@
 # This directory is a WordPress document root, not a source tree: it holds
 # core, vendor plugins, uploads, wp-config.php and the Codewhale session
 # state. Committing any of it would be noise at best and a credential leak
-# at worst (.codewhale/n8n/.env was served over HTTP before it was moved).
+# at worst.
 #
-# Everything is ignored, then only the project's own artifacts are
-# re-included. A new file therefore cannot be committed by accident — it
-# has to be added to this list on purpose.
+# Everything is ignored, then only this project's own code is re-included.
+# A new file cannot be committed by accident — it has to be listed below.
 # ─────────────────────────────────────────────────────────────────────
 /*
 
-# ─── Project artifacts (the only things that belong in git) ─────────
+# ─── Project artifacts ──────────────────────────────────────────────
 !/.gitignore
 !/.gitattributes
 !/.env.example
 !/README.md
-!/plugin/
 !/n8n/
 !/tools/
 !/scripts/
 
+# ─── Our own WordPress code only ────────────────────────────────────
+!/wp-content/
+/wp-content/*
+!/wp-content/plugins/
+/wp-content/plugins/*
+!/wp-content/plugins/woocommerce-smart-order/
+!/wp-content/mu-plugins/
+/wp-content/mu-plugins/*
+!/wp-content/mu-plugins/wso-local-webhook-transport.php
+
 # ─── Secrets: never, under any path ─────────────────────────────────
 .env
 *.env
+!.env.example
 .codewhale/
-wp-config.php
-!/.env.example
+/wp-config.php
 
-# ─── WordPress core and vendor code ─────────────────────────────────
+# ─── Everything else in the web root ────────────────────────────────
 /wp-admin/
 /wp-includes/
-/wp-content/plugins/akismet/
-/wp-content/plugins/woocommerce/
-/wp-content/themes/
-/wp-content/uploads/
-/wp-content/upgrade/
-/wp-content/cache/
-/wp-content/index.php
-
-# ─── WordPress entry points ─────────────────────────────────────────
 /index.php
 /license.txt
 /readme.html
 /wp-*.php
 /xmlrpc.php
-
-# ─── Hosting / local machine state ──────────────────────────────────
 /.osp/
-/.exposure-probe/
+/.idea/
 
 # ─── OS and editor noise ────────────────────────────────────────────
 *.log
