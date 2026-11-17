@@ -1,9 +1,57 @@
-# secrets
+# ─────────────────────────────────────────────────────────────────────
+# Deny by default.
+#
+# This directory is a WordPress document root, not a source tree: it holds
+# core, vendor plugins, uploads, wp-config.php and the Codewhale session
+# state. Committing any of it would be noise at best and a credential leak
+# at worst (.codewhale/n8n/.env was served over HTTP before it was moved).
+#
+# Everything is ignored, then only the project's own artifacts are
+# re-included. A new file therefore cannot be committed by accident — it
+# has to be added to this list on purpose.
+# ─────────────────────────────────────────────────────────────────────
+/*
+
+# ─── Project artifacts (the only things that belong in git) ─────────
+!/.gitignore
+!/.gitattributes
+!/.env.example
+!/README.md
+!/plugin/
+!/n8n/
+!/tools/
+!/scripts/
+
+# ─── Secrets: never, under any path ─────────────────────────────────
 .env
 *.env
-!.env.example
+.codewhale/
+wp-config.php
+!/.env.example
 
-# local scratch
+# ─── WordPress core and vendor code ─────────────────────────────────
+/wp-admin/
+/wp-includes/
+/wp-content/plugins/akismet/
+/wp-content/plugins/woocommerce/
+/wp-content/themes/
+/wp-content/uploads/
+/wp-content/upgrade/
+/wp-content/cache/
+/wp-content/index.php
+
+# ─── WordPress entry points ─────────────────────────────────────────
+/index.php
+/license.txt
+/readme.html
+/wp-*.php
+/xmlrpc.php
+
+# ─── Hosting / local machine state ──────────────────────────────────
+/.osp/
+/.exposure-probe/
+
+# ─── OS and editor noise ────────────────────────────────────────────
 *.log
 .DS_Store
 Thumbs.db
