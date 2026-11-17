@@ -1,25 +1,11 @@
 <?php
 /**
  * Plugin Name: WSO — Local Webhook Transport
- * Description: Allows WordPress to deliver WooCommerce webhooks to a local n8n instance
- *              (127.0.0.1:5678), which wp_safe_remote_post() blocks by default.
+ * Description: Grants wp_safe_remote_request() access to a local n8n instance (127.0.0.1:5678).
  * Version:     1.0.0
  * Requires PHP: 7.4
  *
- * WooCommerce delivers webhooks through wp_safe_remote_request(), so every delivery URL
- * passes WordPress' URL validation first. That validation rejects:
- *
- *   1. hosts that resolve to a private or loopback address
- *      (unless the `http_request_host_is_external` filter allows them), and
- *   2. ports outside `http_allowed_safe_ports` (80, 443, 8080 by default).
- *
- * A local n8n sits at 127.0.0.1:5678 and fails both checks, so WooCommerce reports the
- * delivery action as "complete" while nothing ever leaves the server. This drop-in grants
- * exactly that one destination and nothing else — the allowlist is a host + port + path
- * check, not a blanket "private IPs are fine".
- *
- * Install: copy to wp-content/mu-plugins/ (must-use, always active).
- * Scope:   local development only. A hosted n8n needs no part of this file.
+ * Installed as a must-use plugin. Local development only.
  *
  * @package WSO\Transport
  */

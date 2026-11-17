@@ -11,9 +11,6 @@ namespace WSO\SmartOrder\Config;
 
 /**
  * Typed access to the single `wso_smart_order` option.
- *
- * Secrets are read from wp-config.php constants when defined, so the database never
- * holds an API key and the settings screen never displays one.
  */
 final class Settings {
 

@@ -11,8 +11,6 @@ namespace WSO\SmartOrder\Ai;
 
 /**
  * Turns a raw model answer into an UrgencyResult.
- *
- * Providers differ in transport, not in the contract, so the parsing lives here.
  */
 final class ResponseParser {
 

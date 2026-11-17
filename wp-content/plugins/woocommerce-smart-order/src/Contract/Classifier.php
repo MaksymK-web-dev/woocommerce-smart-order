@@ -19,9 +19,6 @@ interface Classifier {
 	/**
 	 * Classifies a customer comment.
 	 *
-	 * Never throws: a provider failure is reported through
-	 * UrgencyResult::unavailable() so the caller can decide what to do.
-	 *
 	 * @param string $comment Raw customer comment.
 	 */
 	public function classify( string $comment ): UrgencyResult;

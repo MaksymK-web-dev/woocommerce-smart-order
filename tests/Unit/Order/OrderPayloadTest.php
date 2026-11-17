@@ -14,8 +14,7 @@ use PHPUnit\Framework\TestCase;
 use WSO\SmartOrder\Order\OrderPayload;
 
 /**
- * The DTO is the boundary between WooCommerce and everything else, so its one piece of
- * behaviour — deciding whether there is anything to classify — is pinned down.
+ * Covers the DTO's single piece of behaviour: is there anything to classify.
  */
 final class OrderPayloadTest extends TestCase {
 

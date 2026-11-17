@@ -2,12 +2,7 @@
 /**
  * PHPUnit bootstrap.
  *
- * The unit tests cover classes that do not talk to WordPress, WooCommerce or the network.
- * A handful of global functions from WordPress are stubbed below so those classes can be
- * exercised without loading a full WordPress install — fast in CI, no database required.
- *
- * Functions that receive untrusted text (escaping, JSON encoding) are stubbed with their
- * real semantics, not with no-ops, so the assertions still mean something.
+ * Stubs the few WordPress functions the covered classes call.
  *
  * @package WSO\SmartOrder
  */

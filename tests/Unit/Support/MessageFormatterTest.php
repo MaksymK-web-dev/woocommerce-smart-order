@@ -15,8 +15,7 @@ use WSO\SmartOrder\Order\OrderPayload;
 use WSO\SmartOrder\Support\MessageFormatter;
 
 /**
- * Covers the three message states and the HTML escaping that keeps customer text from
- * breaking Telegram markup.
+ * Covers the three message states and HTML escaping.
  */
 final class MessageFormatterTest extends TestCase {
 

@@ -13,8 +13,7 @@ use PHPUnit\Framework\TestCase;
 use WSO\SmartOrder\Ai\Prompt;
 
 /**
- * The prompt is the specification given to the model; if it drifts, classification drifts
- * with it silently. These tests pin the parts that matter.
+ * Pins the parts of the prompt that change classification behaviour.
  */
 final class PromptTest extends TestCase {
 

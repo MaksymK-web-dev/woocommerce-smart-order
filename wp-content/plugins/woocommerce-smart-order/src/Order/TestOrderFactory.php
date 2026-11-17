@@ -10,13 +10,9 @@ declare( strict_types = 1 );
 namespace WSO\SmartOrder\Order;
 
 /**
- * Creates a realistic order for demos, tests and the CLI.
+ * Creates a demo order from the store's published products.
  *
- * One implementation, used by both the WP-CLI command and the standalone demo script.
- * The two had their own copies of this block, which meant an edit to the test data could
- * land in one and not the other.
- *
- * Everything is read through the WooCommerce public API, so it works with HPOS enabled.
+ * Uses only the WooCommerce public API, so it is HPOS-safe.
  */
 final class TestOrderFactory {
 

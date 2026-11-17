@@ -11,9 +11,6 @@ namespace WSO\SmartOrder\Order;
 
 /**
  * Immutable snapshot of the order fields the notification needs.
- *
- * Everything downstream reads this object instead of a WC_Order or an array, so the
- * classification and formatting code stays free of WooCommerce calls.
  */
 final class OrderPayload {
 

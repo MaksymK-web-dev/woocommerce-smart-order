@@ -17,9 +17,6 @@ use WSO\SmartOrder\Support\MessageFormatter;
 
 /**
  * Writes the formatted message to the WooCommerce log instead of sending it.
- *
- * Used while credentials are missing, and as the safe default on a fresh install:
- * the pipeline is observable end to end without a bot token.
  */
 final class LogNotifier implements Notifier {
 

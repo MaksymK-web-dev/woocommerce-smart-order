@@ -22,9 +22,6 @@ use WSO\SmartOrder\Support\MessageFormatter;
 
 /**
  * Wires the services together and boots them once.
- *
- * No service locator and no static container: the dependency graph is small enough to
- * be readable in one method, and explicit constructor injection keeps it testable.
  */
 final class Plugin {
 
@@ -67,7 +64,7 @@ final class Plugin {
 		);
 
 		/**
-		 * Every hook owner, in boot order.
+		 * Hook owners, in boot order.
 		 *
 		 * @var HookRegistrar[]
 		 */
@@ -88,7 +85,7 @@ final class Plugin {
 	}
 
 	/**
-	 * Composition root: the container is this class.
+	 * Use instance() instead.
 	 */
 	private function __construct() {}
 }

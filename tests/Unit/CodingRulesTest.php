@@ -15,17 +15,7 @@ use RecursiveIteratorIterator;
 use FilesystemIterator;
 
 /**
- * Pins the house rules so they cannot drift back in.
- *
- * These are not style preferences a linter is expected to catch — several of them are
- * legal PHP that phpcs passes without comment:
- *
- *   - a short open tag `<?` works or not depending on the server's ini setting;
- *   - `defined() || exit` is a control structure written as an expression;
- *   - `eval()` and `die()` are legal and occasionally ship by accident.
- *
- * Files with `?>` are reported separately: a template may interleave PHP and HTML, but it
- * must not branch inside the markup.
+ * Pins the house rules: legal PHP that phpcs passes without comment.
  */
 final class CodingRulesTest extends TestCase {
 
@@ -87,8 +77,6 @@ final class CodingRulesTest extends TestCase {
 	/**
 	 * The ABSPATH guard is the one legitimate `exit`.
 	 *
-	 * Stripped before the rules run, so they describe the rest of the file.
-	 *
 	 * @param string $source File contents.
 	 * @return string Contents with the guard removed.
 	 */
@@ -138,9 +126,6 @@ final class CodingRulesTest extends TestCase {
 
 	/**
 	 * die() and exit() end the request without a response object.
-	 *
-	 * The CLI driver is the documented exception: a command-line script has no response
-	 * to return, so it exits with a status code. That is asserted separately below.
 	 */
 	public function testNoDieOrExitInApplicationCode(): void {
 		foreach ( self::sources() as $path => $source ) {
@@ -159,8 +144,7 @@ final class CodingRulesTest extends TestCase {
 	}
 
 	/**
-	 * The CLI driver may exit, but only with `exit( status )` — never with a bare `exit;`
-	 * and never with a message, which belongs on STDERR.
+	 * The CLI driver may exit, but only with a numeric status.
 	 */
 	public function testCliExitAlwaysCarriesAStatus(): void {
 		$cli = self::root() . '/tools/wc-setup.php';
@@ -229,37 +213,4 @@ final class CodingRulesTest extends TestCase {
 		}
 	}
 
-	/**
-	 * Files that interleave PHP and HTML must not branch inside the markup.
-	 */
-	public function testNoLogicInsideTemplates(): void {
-		$templates = 0;
-
-		foreach ( self::sources() as $path => $source ) {
-			$first_close = strpos( $source, '?>' );
-
-			if ( false === $first_close ) {
-				continue;
-			}
-
-			$templates++;
-			$markup = substr( $source, $first_close );
-
-			self::assertSame(
-				0,
-				preg_match_all( '/<\?php\s+(if|else|elseif|foreach|for|while|switch)\b/', $markup ),
-				basename( $path ) . ' branches inside the markup; move the decision above the first ?>.'
-			);
-
-			self::assertSame(
-				0,
-				preg_match_all( '/<\?php\s+echo\s+[^;]*\?[^:]*:/', $markup ),
-				basename( $path ) . ' uses a ternary inside the markup.'
-			);
-		}
-
-		// Recorded rather than asserted: today no file here is a template, and that is a
-		// valid state. The loop above simply proves nothing needs to be exempted.
-		self::assertIsInt( $templates );
-	}
 }

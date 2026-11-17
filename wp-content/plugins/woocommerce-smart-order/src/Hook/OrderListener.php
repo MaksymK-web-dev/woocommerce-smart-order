@@ -16,19 +16,12 @@ use WSO\SmartOrder\Support\Logger;
 /**
  * Runs the pipeline when a new order appears.
  *
- * `woocommerce_new_order` fires inside the very first `$order->save()`, before products,
- * addresses and the customer note are attached — reading the order there yields an empty
- * object. The listener therefore only collects ids and defers the work to `shutdown`,
- * when the order is fully populated and still inside the same request.
- *
- * `woocommerce_new_order` also covers admin and REST creation, and it passes the id, which
- * keeps this HPOS-safe: no direct access to the posts table anywhere.
+ * The hook fires before the order is populated, so ids are collected here and processed
+ * on `shutdown`.
  */
 final class OrderListener implements HookRegistrar {
 
 	/**
-	 * Order ids collected during this request.
-	 *
 	 * Order ids collected during this request.
 	 *
 	 * @var array<int, bool>

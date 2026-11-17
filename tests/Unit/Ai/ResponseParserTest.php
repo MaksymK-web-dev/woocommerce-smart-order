@@ -14,8 +14,7 @@ use PHPUnit\Framework\TestCase;
 use WSO\SmartOrder\Ai\ResponseParser;
 
 /**
- * The parser is the only place where untrusted model output is interpreted, so it is
- * tested against the shapes a model actually returns.
+ * Covers the parser against the shapes a model actually returns.
  */
 final class ResponseParserTest extends TestCase {
 

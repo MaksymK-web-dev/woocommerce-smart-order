@@ -16,9 +16,6 @@ use WSO\SmartOrder\Support\Logger;
 
 /**
  * Order in → classification → notification out.
- *
- * Kept free of hook registration so it can be driven from a hook, a CLI command or a
- * test without touching WordPress globals beyond wc_get_order().
  */
 final class Pipeline {
 

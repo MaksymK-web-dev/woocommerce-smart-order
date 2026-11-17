@@ -1,9 +1,6 @@
 <?php
 /**
- * PSR-4 autoloader for the WSO\SmartOrder namespace.
- *
- * No Composer dependency: the plugin ships as a single directory and must work on
- * shared hosting where `composer install` never ran.
+ * PSR-4 autoloader.
  *
  * @package WSO\SmartOrder
  */

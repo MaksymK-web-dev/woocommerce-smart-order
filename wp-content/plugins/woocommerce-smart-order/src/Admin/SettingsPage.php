@@ -13,15 +13,9 @@ use WSO\SmartOrder\Config\Settings;
 use WSO\SmartOrder\Contract\HookRegistrar;
 
 /**
- * WooCommerce → Smart Order settings page built on the Settings API.
+ * WooCommerce → Smart Order settings screen.
  *
- * Secrets are never printed: keys come from wp-config.php constants, and when the option
- * fallback is used the field renders empty, so a stored value cannot be read back from
- * the screen.
- *
- * Every method here follows one shape: decide first, print second. The render helpers
- * return finished, escaped strings; nothing that makes a decision runs while output is
- * being written.
+ * Secrets are never printed: an option fallback renders as an empty field.
  */
 final class SettingsPage implements HookRegistrar {
 
@@ -41,9 +35,8 @@ final class SettingsPage implements HookRegistrar {
 	public function register(): void {
 		add_action( 'admin_menu', array( $this, 'addMenu' ) );
 		add_action( 'admin_init', array( $this, 'registerSettings' ) );
-		// options.php defaults to `manage_options` for every option group. Without this
-		// filter a shop manager, who has `manage_woocommerce` but not `manage_options`,
-		// can open the screen and is then refused with a 403 on save.
+		// options.php requires `manage_options` for every option group unless this filter
+		// says otherwise, and shop managers do not have it.
 		add_filter( 'option_page_capability_' . self::SLUG, array( $this, 'optionPageCapability' ) );
 	}
 
@@ -168,9 +161,7 @@ final class SettingsPage implements HookRegistrar {
 	}
 
 	/**
-	 * Accepts a group id (negative number), a user id (number) or an @channel name.
-	 *
-	 * Anything else is dropped rather than stored and rejected later at send time.
+	 * Accepts a numeric id or an @channel name.
 	 *
 	 * @param string $value Raw value.
 	 */

@@ -11,9 +11,6 @@ namespace WSO\SmartOrder\Ai;
 
 /**
  * The system prompt and the JSON contract every provider adapter shares.
- *
- * Kept in one place so switching providers cannot silently change the classification
- * criteria.
  */
 final class Prompt {
 

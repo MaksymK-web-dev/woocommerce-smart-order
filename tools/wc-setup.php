@@ -1,18 +1,14 @@
 <?php
 /**
- * Reproducible demo driver for the WooCommerce → n8n → Telegram chain.
- *
- * CLI only. Deliberately outside wp-content so it never ships with the site.
+ * Demo driver for the WooCommerce → n8n → Telegram chain.
  *
  *   php tools/wc-setup.php webhook http://127.0.0.1:5678/webhook/wc-order-created
- *   php tools/wc-setup.php order "Доставка після 18:00, зателефонувати за годину"
+ *   php tools/wc-setup.php order "Delivery after 18:00, call an hour ahead"
  *   php tools/wc-setup.php deliver 28
  *   php tools/wc-setup.php cron
  *   php tools/wc-setup.php list
  *
- * WordPress root resolution order:
- *   1. --root=/path/to/wordpress   (or WSO_WP_ROOT env var)
- *   2. three levels up from this file (the usual wp-content/plugins/<plugin>/tools layout)
+ * WordPress root: --root=/path/to/wordpress, or WSO_WP_ROOT, or three levels up.
  *
  * @package WSO\Tools
  */
@@ -71,7 +67,7 @@ if ( ! class_exists( 'WC_Webhook' ) ) {
 /**
  * Lists every webhook.
  *
- * wc_get_webhooks() was removed in WooCommerce 11.x, so this goes through the data store.
+ * wc_get_webhooks() no longer exists in WooCommerce 11.x, hence the data store.
  *
  * @return WC_Webhook[]
  */
@@ -151,9 +147,7 @@ switch ( $command ) {
 	case 'order':
 		$note = $argument;
 
-		// The factory lives in the plugin so the CLI command and this script cannot drift
-		// apart. Loaded through the autoloader, so it works even when the plugin is
-		// deactivated for testing.
+		// Loaded lazily: the autoloader works even when the plugin is inactive.
 		if ( ! class_exists( \WSO\SmartOrder\Order\TestOrderFactory::class ) ) {
 			$autoload = WP_PLUGIN_DIR . '/woocommerce-smart-order/autoload.php';
 
@@ -188,8 +182,7 @@ switch ( $command ) {
 			'' !== $note ? $note : '—'
 		);
 
-		// Webhook delivery is asynchronous (Action Scheduler). A local site with no
-		// traffic never runs the queue, so drain it here.
+		// Webhook delivery is asynchronous, and a local site has no traffic to drain the queue.
 		do_action( 'action_scheduler_run_queue', 'WP Cron' );
 		break;
 

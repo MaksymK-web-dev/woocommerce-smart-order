@@ -14,9 +14,6 @@ use WSO\SmartOrder\Order\OrderPayload;
 
 /**
  * Turns a payload and a classification into the manager-facing message.
- *
- * Telegram's HTML mode is a limited subset, so the output uses <b> only and escapes
- * every interpolated value. Customer text is untrusted input.
  */
 final class MessageFormatter {
 

@@ -1,6 +1,6 @@
 <?php
 /**
- * Marker for classes that register their own WordPress hooks.
+ * Hook registrar contract.
  *
  * @package WSO\SmartOrder
  */

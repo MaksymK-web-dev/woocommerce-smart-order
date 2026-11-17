@@ -19,10 +19,6 @@ use WSO\SmartOrder\Support\MessageFormatter;
 
 /**
  * Exercises the pipeline from the command line.
- *
- * `wp smart-order test "comment"` creates a real order through the same factory the demo
- * script uses and runs the real pipeline, so the full path is verifiable without logging
- * into wp-admin.
  */
 final class TestOrderCommand {
 
@@ -46,7 +42,7 @@ final class TestOrderCommand {
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     wp smart-order test "Доставка після 18:00, зателефонувати за годину"
+	 *     wp smart-order test "Delivery after 18:00, call an hour ahead"
 	 *
 	 * @param array<int, string>    $args      Positional arguments.
 	 * @param array<string, string> $assocArgs Flags.

@@ -14,9 +14,6 @@ use WSO\SmartOrder\Support\Logger;
 
 /**
  * Classifies comments through the Anthropic messages endpoint.
- *
- * Swapping providers is a settings change, not a code change: this class fulfils the
- * same Classifier contract as OpenAiClassifier.
  */
 final class AnthropicClassifier implements Classifier {
 

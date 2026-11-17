@@ -11,9 +11,6 @@ namespace WSO\SmartOrder\Ai;
 
 /**
  * Outcome of a comment classification.
- *
- * Three states, not two: "not urgent" and "could not classify" must never look the
- * same to a manager.
  */
 final class UrgencyResult {
 

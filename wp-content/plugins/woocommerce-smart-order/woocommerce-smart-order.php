@@ -29,9 +29,7 @@ define( 'WSO_SMART_ORDER_DIR', __DIR__ );
 
 require_once __DIR__ . '/autoload.php';
 
-/**
- * Declares compatibility with HPOS before WooCommerce initialises its order tables.
- */
+// WooCommerce reads this before its order tables are initialized.
 add_action(
 	'before_woocommerce_init',
 	static function (): void {
@@ -41,9 +39,6 @@ add_action(
 	}
 );
 
-/**
- * Boots the plugin once WooCommerce is available.
- */
 add_action(
 	'plugins_loaded',
 	static function (): void {
