@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="220" viewBox="0 0 880 220" role="img" aria-labelledby="title desc">
+  <title id="title">WooCommerce Smart Order</title>
+  <desc id="desc">New order enters WooCommerce, the customer comment is classified by an LLM, and the manager receives a Telegram message.</desc>
+
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0d1117"/>
+      <stop offset="100%" stop-color="#161b22"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#96588a"/>
+      <stop offset="50%" stop-color="#7f54b3"/>
+      <stop offset="100%" stop-color="#2d9cdb"/>
+    </linearGradient>
+    <style>
+      .t  { font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+      .h  { font-size: 30px; font-weight: 700; fill: #f0f6fc; letter-spacing: -0.5px; }
+      .s  { font-size: 13.5px; fill: #9198a1; }
+      .n  { font-size: 11px; font-weight: 600; fill: #f0f6fc; letter-spacing: 0.3px; }
+      .c  { font-size: 10px; fill: #8b949e; letter-spacing: 0.2px; }
+      .badge { font-size: 10px; font-weight: 600; letter-spacing: 0.6px; }
+    </style>
+  </defs>
+
+  <rect width="880" height="220" rx="14" fill="url(#bg)"/>
+  <rect width="880" height="4" rx="2" fill="url(#accent)"/>
+
+  <g class="t">
+    <text x="44" y="72" class="h">WooCommerce Smart Order</text>
+    <text x="44" y="98" class="s">A delivery-time request hides in the customer comment.</text>
+    <text x="44" y="118" class="s">An LLM finds it before dispatch does.</text>
+  </g>
+
+  <g transform="translate(44,150)">
+    <rect width="150" height="46" rx="8" fill="#1c2128" stroke="#30363d"/>
+    <text x="75" y="20" text-anchor="middle" class="t n">WooCommerce</text>
+    <text x="75" y="34" text-anchor="middle" class="t c">order.created</text>
+
+    <rect x="172" width="150" height="46" rx="8" fill="#1c2128" stroke="#30363d"/>
+    <text x="247" y="20" text-anchor="middle" class="t n">Extract</text>
+    <text x="247" y="34" text-anchor="middle" class="t c">name · phone · items</text>
+
+    <rect x="344" width="150" height="46" rx="8" fill="#1c2a3a" stroke="#2d9cdb"/>
+    <text x="419" y="20" text-anchor="middle" class="t n">LLM classify</text>
+    <text x="419" y="34" text-anchor="middle" class="t c">{ urgent, note }</text>
+
+    <rect x="516" width="130" height="46" rx="8" fill="#1c2128" stroke="#30363d"/>
+    <text x="581" y="20" text-anchor="middle" class="t n">Format</text>
+    <text x="581" y="34" text-anchor="middle" class="t c">escaped HTML</text>
+
+    <rect x="668" width="150" height="46" rx="8" fill="#1f2b22" stroke="#3fb950"/>
+    <text x="743" y="20" text-anchor="middle" class="t n">Telegram</text>
+    <text x="743" y="34" text-anchor="middle" class="t c">manager group</text>
+
+    <g stroke="#484f58" stroke-width="1.5" fill="none">
+      <path d="M152 23 H168" marker-end="url(#a)"/>
+      <path d="M324 23 H340"/>
+      <path d="M496 23 H512"/>
+      <path d="M648 23 H664"/>
+    </g>
+  </g>
+
+  <g transform="translate(690,54)">
+    <rect width="146" height="24" rx="12" fill="#1f6feb22" stroke="#1f6feb"/>
+    <text x="73" y="16" text-anchor="middle" class="t badge" fill="#79c0ff">PHP · n8n · LLM</text>
+  </g>
+</svg>

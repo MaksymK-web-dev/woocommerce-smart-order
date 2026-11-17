@@ -1,5 +1,8 @@
 # WooCommerce Smart Order
 
+<p align="center">
+  <img src="docs/cover.svg" alt="WooCommerce Smart Order — order pipeline with LLM classification" width="880">
+</p>
 [![CI](https://github.com/MaksymK-web-dev/woocommerce-smart-order/actions/workflows/ci.yml/badge.svg)](https://github.com/MaksymK-web-dev/woocommerce-smart-order/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![PHP](https://img.shields.io/badge/php-8.1%2B-777bb4.svg)](composer.json)
