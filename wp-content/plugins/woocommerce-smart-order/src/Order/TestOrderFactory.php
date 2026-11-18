@@ -25,10 +25,10 @@ final class TestOrderFactory {
 		'first_name' => 'Іван',
 		'last_name'  => 'Петренко',
 		'phone'      => '+000000000000',
-		'email'      => 'ivan.petrenko@example.com',
+		'email'      => 'customer@example.test',
 		'address_1'  => 'вул. Городоцька, 12',
 		'city'       => 'Львів',
-		'postcode'   => '79000',
+		'postcode'   => '00000',
 		'country'    => 'UA',
 	);
 
