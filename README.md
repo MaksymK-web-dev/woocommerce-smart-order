@@ -81,17 +81,37 @@ which is exactly what the first working version did: `No name (not provided)`,
 
 ### Configuration
 
-Secrets belong in `wp-config.php`, so they never reach the database or the settings screen:
+Everything a shop manager needs lives at **WooCommerce → Smart Order**: enable, provider,
+model, transport, group id, and the two credentials. Credentials can come from two places:
+
+1. **`wp-config.php` constants** — outside the database, outside git, wins over the screen:
 
 ```php
 define( 'WSO_OPENAI_API_KEY', 'sk-...' );      // or WSO_ANTHROPIC_API_KEY
 define( 'WSO_TELEGRAM_BOT_TOKEN', '123:AA...' );
 ```
 
-The screen at **WooCommerce → Smart Order** handles everything else: enable, provider,
-model, transport, group id. With transport set to *Log only* the pipeline is fully
-observable in **WooCommerce → Status → Logs** (`woocommerce-smart-order` source) without any
-credentials — that is the default, so a fresh install never fails silently.
+2. **The settings screen** — stored in the `wso_smart_order` option. Rotating a key is a
+   form submit, not a deploy. The field never prints a stored value back: empty means
+   *keep what is stored*.
+
+Each secret shows where its effective value comes from (*not set* / *saved in the database* /
+*set in wp-config.php — the stored value is ignored*), and **Test connection** proves it
+before anything depends on it. The check is live but costs nothing: both AI providers expose
+a models listing that authenticates the key, and Telegram's `getMe` + `getChat` confirm the
+token and that the bot can see the configured group. A key typed into the field is tested
+without saving first.
+
+With transport set to *Log only* the pipeline is fully observable in
+**WooCommerce → Status → Logs** (`woocommerce-smart-order` source) without any credentials —
+that is the default, so a fresh install never fails silently.
+
+### One chain per order
+
+The plugin and the n8n workflow are two implementations of the same delivery. Both fire on
+the same event, so running both means two messages per order. *Enable processing* is the
+switch: turn the plugin off when n8n delivers. The settings screen also looks for active
+`order.created` webhooks and warns, naming them, when both chains are live.
 
 ## Implementation 2 — n8n workflow
 
@@ -164,9 +184,15 @@ Verified on a local WordPress 7.1.4 + WooCommerce 11.3.0 + PHP 8.4 install:
   a correctly populated message: `Іван Петренко`, `+000000000000`,
   `STEM Robotics Kit (x2), Interactive Smart Board (x1)`, `637.00 UAH`, the comment, and
   the *AI unavailable* line (no key configured);
-- 34 unit tests over the parser (fenced JSON, `{"urgent": "false"}`, prose, arrays,
-  missing keys), the formatter (three branches, markup escaping, double-escaping) and the
-  prompt contract;
+- 60 unit tests over the parser (fenced JSON, `{"urgent": "false"}`, prose, arrays,
+  missing keys), the formatter (three branches, markup escaping, double-escaping), the
+  prompt contract, and the credential checks (missing key, provider error, transport
+  failure, unreachable Telegram group);
+- live checks against both providers: a bogus OpenAI key returns
+  `Incorrect API key provided`, a bogus bot token returns `Unauthorized` — the admin
+  buttons report the provider's own wording;
+- the duplicate-delivery warning fires on the settings screen for the real
+  `order.created` webhook and stays silent on every other screen;
 - coding standards clean under WordPress rules, adapted for PSR-4 as documented in
   `phpcs.xml.dist`;
 - n8n chain: order → Action Scheduler → webhook delivered → execution recorded, nodes 1
@@ -177,6 +203,8 @@ Not verified — stated rather than implied:
 - no live model response has been classified: `urgent: true` is proven by unit tests, not
   by an API round-trip;
 - no message has reached a real Telegram group (no bot token at build time);
+- the settings form has been rendered and inspected through the WordPress admin APIs, but
+  not clicked in a browser;
 - the CI workflow has not run yet at the time of writing.
 
 ## Known gaps

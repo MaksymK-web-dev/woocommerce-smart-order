@@ -9,6 +9,8 @@ declare( strict_types = 1 );
 
 namespace WSO\SmartOrder;
 
+use WSO\SmartOrder\Admin\ConnectionTester;
+use WSO\SmartOrder\Admin\DeliveryConflict;
 use WSO\SmartOrder\Admin\SettingsPage;
 use WSO\SmartOrder\Ai\ClassifierFactory;
 use WSO\SmartOrder\Cli\TestOrderCommand;
@@ -70,7 +72,8 @@ final class Plugin {
 		 */
 		$registrars = array(
 			new OrderListener( $pipeline, static fn (): bool => Settings::enabled() ),
-			new SettingsPage(),
+			new SettingsPage( new ConnectionTester() ),
+			new DeliveryConflict(),
 		);
 
 		foreach ( $registrars as $registrar ) {

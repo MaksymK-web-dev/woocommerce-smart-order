@@ -74,3 +74,129 @@ if ( ! function_exists( 'wc_get_logger' ) ) {
 		};
 	}
 }
+
+/**
+ * In-memory option store. Tests reset it in setUp().
+ *
+ * @var array<string, mixed>
+ */
+$GLOBALS['wso_test_options'] = array();
+
+/**
+ * Queued HTTP responses, consumed in order. Tests reset it in setUp().
+ *
+ * @var array<int, mixed>
+ */
+$GLOBALS['wso_test_http'] = array();
+
+/**
+ * URLs the code under test requested.
+ *
+ * @var string[]
+ */
+$GLOBALS['wso_test_requests'] = array();
+
+if ( ! function_exists( 'get_option' ) ) {
+	/**
+	 * Option read stub.
+	 *
+	 * @param string $name    Option name.
+	 * @param mixed  $default Value when the option is absent.
+	 * @return mixed
+	 */
+	function get_option( string $name, mixed $default = false ): mixed {
+		return $GLOBALS['wso_test_options'][ $name ] ?? $default;
+	}
+}
+
+if ( ! function_exists( 'update_option' ) ) {
+	/**
+	 * Option write stub.
+	 *
+	 * @param string $name  Option name.
+	 * @param mixed  $value Value.
+	 * @return bool
+	 */
+	function update_option( string $name, mixed $value ): bool {
+		$GLOBALS['wso_test_options'][ $name ] = $value;
+
+		return true;
+	}
+}
+
+if ( ! class_exists( 'WP_Error' ) ) {
+	/**
+	 * Minimal WP_Error.
+	 */
+	class WP_Error {
+
+		/**
+		 * Sets up the error.
+		 *
+		 * @param string $code    Error code.
+		 * @param string $message Error message.
+		 */
+		public function __construct(
+			private readonly string $code = '',
+			private readonly string $message = ''
+		) {}
+
+		/**
+		 * Returns the message.
+		 */
+		public function get_error_message(): string {
+			return $this->message;
+		}
+	}
+}
+
+if ( ! function_exists( 'is_wp_error' ) ) {
+	/**
+	 * Error test stub.
+	 *
+	 * @param mixed $thing Value.
+	 * @return bool
+	 */
+	function is_wp_error( mixed $thing ): bool {
+		return $thing instanceof WP_Error;
+	}
+}
+
+if ( ! function_exists( 'wp_remote_get' ) ) {
+	/**
+	 * HTTP stub: returns the next queued response.
+	 *
+	 * @param string                $url  Requested URL.
+	 * @param array<string, mixed>  $args Request arguments.
+	 * @return mixed
+	 */
+	function wp_remote_get( string $url, array $args = array() ): mixed {
+		$GLOBALS['wso_test_requests'][] = $url;
+
+		return array_shift( $GLOBALS['wso_test_http'] );
+	}
+}
+
+if ( ! function_exists( 'wp_remote_retrieve_response_code' ) ) {
+	/**
+	 * Status code stub.
+	 *
+	 * @param mixed $response Response.
+	 * @return int
+	 */
+	function wp_remote_retrieve_response_code( mixed $response ): int {
+		return (int) ( $response['response']['code'] ?? 0 );
+	}
+}
+
+if ( ! function_exists( 'wp_remote_retrieve_body' ) ) {
+	/**
+	 * Body stub.
+	 *
+	 * @param mixed $response Response.
+	 * @return string
+	 */
+	function wp_remote_retrieve_body( mixed $response ): string {
+		return (string) ( $response['body'] ?? '' );
+	}
+}

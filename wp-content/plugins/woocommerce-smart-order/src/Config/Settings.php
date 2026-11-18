@@ -22,6 +22,15 @@ final class Settings {
 	public const MODE_TELEGRAM = 'telegram';
 	public const MODE_LOG      = 'log';
 
+	public const SOURCE_CONSTANT = 'constant';
+	public const SOURCE_STORED   = 'stored';
+	public const SOURCE_NONE     = 'none';
+
+	/**
+	 * Name of the wp-config.php constant that overrides the stored bot token.
+	 */
+	public const TELEGRAM_CONSTANT = 'WSO_TELEGRAM_BOT_TOKEN';
+
 	/**
 	 * Returns all stored settings merged with defaults.
 	 *
@@ -86,27 +95,63 @@ final class Settings {
 	}
 
 	/**
+	 * Name of the wp-config.php constant that overrides the stored AI key.
+	 */
+	public static function apiKeyConstant(): string {
+		return self::PROVIDER_ANTHROPIC === self::provider() ? 'WSO_ANTHROPIC_API_KEY' : 'WSO_OPENAI_API_KEY';
+	}
+
+	/**
 	 * Reads the AI key: constant first, option as a fallback for local testing.
 	 */
 	public static function apiKey(): string {
-		$constant = self::PROVIDER_ANTHROPIC === self::provider() ? 'WSO_ANTHROPIC_API_KEY' : 'WSO_OPENAI_API_KEY';
+		$key = self::constantValue( self::apiKeyConstant() );
 
-		if ( defined( $constant ) && '' !== (string) constant( $constant ) ) {
-			return (string) constant( $constant );
+		return '' !== $key ? $key : trim( (string) ( self::all()['api_key'] ?? '' ) );
+	}
+
+	/**
+	 * Where the effective AI key comes from: `constant`, `stored` or `none`.
+	 */
+	public static function apiKeySource(): string {
+		if ( '' !== self::constantValue( self::apiKeyConstant() ) ) {
+			return self::SOURCE_CONSTANT;
 		}
 
-		return trim( (string) ( self::all()['api_key'] ?? '' ) );
+		return '' !== trim( (string) ( self::all()['api_key'] ?? '' ) ) ? self::SOURCE_STORED : self::SOURCE_NONE;
 	}
 
 	/**
 	 * Reads the Telegram bot token: constant first, option as a fallback.
 	 */
 	public static function telegramToken(): string {
-		if ( defined( 'WSO_TELEGRAM_BOT_TOKEN' ) && '' !== (string) WSO_TELEGRAM_BOT_TOKEN ) {
-			return (string) WSO_TELEGRAM_BOT_TOKEN;
+		$token = self::constantValue( self::TELEGRAM_CONSTANT );
+
+		return '' !== $token ? $token : trim( (string) ( self::all()['telegram_token'] ?? '' ) );
+	}
+
+	/**
+	 * Where the effective bot token comes from: `constant`, `stored` or `none`.
+	 */
+	public static function telegramTokenSource(): string {
+		if ( '' !== self::constantValue( self::TELEGRAM_CONSTANT ) ) {
+			return self::SOURCE_CONSTANT;
 		}
 
-		return trim( (string) ( self::all()['telegram_token'] ?? '' ) );
+		return '' !== trim( (string) ( self::all()['telegram_token'] ?? '' ) ) ? self::SOURCE_STORED : self::SOURCE_NONE;
+	}
+
+	/**
+	 * Reads a constant when it exists and is not empty.
+	 *
+	 * @param string $name Constant name.
+	 */
+	private static function constantValue( string $name ): string {
+		if ( ! defined( $name ) ) {
+			return '';
+		}
+
+		return trim( (string) constant( $name ) );
 	}
 
 	/**

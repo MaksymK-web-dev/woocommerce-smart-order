@@ -11,6 +11,28 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Repository scaffolding: MIT license, CI (lint on PHP 8.1–8.4, coding standards, tests,
   workflow JSON regeneration check), editorconfig.
 
+## [1.1.0] — 2026-11-18
+
+### Added
+
+- **Test connection** buttons on the settings screen. Each one performs a live, free check:
+  the AI providers' models listing authenticates the key, Telegram's `getMe` + `getChat`
+  confirm the token and that the bot can see the group. A value typed into the field is
+  tested before it is saved.
+- The screen reports where each credential comes from — *not set*, *saved in the database*,
+  or *set in wp-config.php — the stored value is ignored*.
+- Warning on the settings screen when the plugin is enabled and a WooCommerce
+  `order.created` webhook is also active: two chains mean two messages per order.
+- Help text for every field, including the reason to switch processing off when n8n owns
+  the delivery.
+
+### Changed
+
+- Credentials may now be stored in the database through the settings screen. Constants in
+  `wp-config.php` still take priority when present, so production can keep secrets outside
+  the database without a code change.
+- `ConnectionTesterTest` and `SettingsTest` added; the suite is 60 tests.
+
 ## [1.0.0] — 2026-11-17
 
 ### Added
