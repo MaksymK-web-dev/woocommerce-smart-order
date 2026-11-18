@@ -1,9 +1,3 @@
-# Changelog
-
-All notable changes to this project are documented here.
-The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
-project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
 ## [Unreleased]
 
 ### Added
@@ -11,6 +5,49 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Repository scaffolding: MIT license, CI (lint on PHP 8.1–8.4, coding standards, tests,
   workflow JSON regeneration check), editorconfig.
 
+## [1.2.0] — 2026-11-18
+
+### Added
+
+- **A provider is a base URL plus a model, not a class.** OpenAI, Google Gemini (through its
+  OpenAI-compatible endpoint), Anthropic's native protocol, and a *Custom endpoint* for
+  OpenRouter, Groq, DeepSeek, Mistral, vLLM, Ollama or LM Studio. The model field is free
+  text, so using a different model needs no code change.
+- **One API key per provider.** Keys are stored as a `provider => key` map, so switching the
+  provider no longer sends the previous service's key to the new one — the failure that
+  produced *Incorrect API key provided* from OpenAI for a Google key. An install upgrading
+  from the single-key version keeps its key under the provider it was stored with.
+- **`Config\Draft`** — the configuration a form describes, resolved without writing anything.
+  *Test connection* now checks the provider, base URL, model, key and chat id **as they
+  appear on screen**, not as they were last saved.
+- **`Support\Url`** — strict base-URL validation: `http`/`https` only, a host with a dot or
+  localhost/IP, no query or fragment. A credential pasted into that field is rejected
+  instead of becoming `http://<key>`.
+- **`Ai\KeyPrefix`** — recognises `AIza` (Gemini), `sk-ant-` (Anthropic) and `sk-` (OpenAI).
+  A key belonging to another service is named in one sentence, and no request is wasted.
+- Optional request parameters degrade instead of failing: a provider that rejects
+  `response_format` or `temperature` gets the request retried without it.
+- `wso_smart_order_classifier` filter, so a provider with its own protocol can be supplied
+  from another plugin.
+- `JsonBody` unwraps the one-element array envelope some gateways (Gemini) return around
+  error bodies, so the admin sees the provider's own message instead of `HTTP 400`.
+- A model name carried over from another provider is replaced by the current provider's
+  default rather than sent and rejected.
+- A wrong model is named on a 404, because *HTTP 404* alone says nothing actionable.
+- A warning at save time when the transport is Telegram but the group id is empty, since
+  messages would otherwise be written to the log and never sent.
+
+### Changed
+
+- `OpenAiClassifier` becomes `OpenAiCompatibleClassifier` and takes a base URL.
+- `WSO_AI_API_KEY` is the constant for Gemini and custom endpoints.
+- `autoload.php` refuses direct access and rejects `..` in a class name; it uses `return`
+  rather than `exit`, so a process that includes it is not killed.
+
+### Fixed
+
+- The settings screen printed the AI-key summary under the bot-token field.
+- A rejected base URL disappeared without a word; `settings_errors()` now renders it.
 ## [1.1.0] — 2026-11-18
 
 ### Added
