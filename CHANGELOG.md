@@ -51,6 +51,18 @@
   the same message (`wp-content/mu-plugins/wso-login-hardening.php`).
 - The settings screen refuses a typed key when a `wp-config.php` constant shadows it,
   instead of storing a secret that would never be used.
+### Changed
+
+- **Credentials are managed from the settings screen only.** The plugin no longer reads
+  `wp-config.php` constants for the API key or the bot token. A constant that silently
+  outranked the form meant an owner who pasted a fresh key still had the old one in use,
+  with no way to see why. One source of truth: the form.
+- `Settings` loses `apiKeyConstant()`, `apiKeyConstantFor()`, `TELEGRAM_CONSTANT` and the
+  `SOURCE_CONSTANT` state; `apiKeySource()` and `telegramTokenSource()` now report only
+  *stored* or *none*.
+- The settings screen no longer refuses a typed key on the grounds of a shadowing
+  constant, because there is no such constant any more.
+
 ## [1.2.0] — 2026-11-18
 
 ### Added

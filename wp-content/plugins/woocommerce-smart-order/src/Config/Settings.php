@@ -28,14 +28,8 @@ final class Settings {
 	public const MODE_TELEGRAM = 'telegram';
 	public const MODE_LOG      = 'log';
 
-	public const SOURCE_CONSTANT = 'constant';
-	public const SOURCE_STORED   = 'stored';
-	public const SOURCE_NONE     = 'none';
-
-	/**
-	 * Name of the wp-config.php constant that overrides the stored bot token.
-	 */
-	public const TELEGRAM_CONSTANT = 'WSO_TELEGRAM_BOT_TOKEN';
+	public const SOURCE_STORED = 'stored';
+	public const SOURCE_NONE   = 'none';
 
 	/**
 	 * Base URL for each provider. A provider is a URL plus a model name, not a class:
@@ -60,18 +54,6 @@ final class Settings {
 		self::PROVIDER_ANTHROPIC => 'claude-3-5-haiku-latest',
 		self::PROVIDER_GEMINI    => 'gemini-2.5-flash',
 		self::PROVIDER_CUSTOM    => 'gpt-4o-mini',
-	);
-
-	/**
-	 * Name of the wp-config.php constant holding a provider's key, when the site keeps one there.
-	 *
-	 * @var array<string, string>
-	 */
-	private const KEY_CONSTANTS = array(
-		self::PROVIDER_OPENAI    => 'WSO_OPENAI_API_KEY',
-		self::PROVIDER_ANTHROPIC => 'WSO_ANTHROPIC_API_KEY',
-		self::PROVIDER_GEMINI    => 'WSO_AI_API_KEY',
-		self::PROVIDER_CUSTOM    => 'WSO_AI_API_KEY',
 	);
 
 	/**
@@ -278,22 +260,6 @@ final class Settings {
 	}
 
 	/**
-	 * Name of the wp-config.php constant that can hold a provider's key.
-	 *
-	 * @param string $provider Provider identifier.
-	 */
-	public static function apiKeyConstantFor( string $provider ): string {
-		return self::KEY_CONSTANTS[ self::normalizeProvider( $provider ) ] ?? 'WSO_AI_API_KEY';
-	}
-
-	/**
-	 * Name of the wp-config.php constant for the selected provider.
-	 */
-	public static function apiKeyConstant(): string {
-		return self::apiKeyConstantFor( self::provider() );
-	}
-
-	/**
 	 * Key stored for one provider.
 	 *
 	 * @param string $provider Provider identifier.
@@ -313,14 +279,12 @@ final class Settings {
 	}
 
 	/**
-	 * Effective key for a provider: the constant first, the stored value second.
+	 * Effective key for a provider. Keys are managed from the settings screen only.
 	 *
 	 * @param string $provider Provider identifier.
 	 */
 	public static function apiKeyFor( string $provider ): string {
-		$constant = self::constantValue( self::apiKeyConstantFor( $provider ) );
-
-		return '' !== $constant ? $constant : self::storedApiKeyFor( $provider );
+		return self::storedApiKeyFor( $provider );
 	}
 
 	/**
@@ -331,16 +295,21 @@ final class Settings {
 	}
 
 	/**
-	 * Where a provider's effective key comes from: `constant`, `stored` or `none`.
+	 * Whether a provider holds a key.
+	 *
+	 * @param string $provider Provider identifier.
+	 */
+	public static function hasApiKeyFor( string $provider ): bool {
+		return '' !== self::storedApiKeyFor( $provider );
+	}
+
+	/**
+	 * Where a provider's key comes from: `stored` or `none`.
 	 *
 	 * @param string $provider Provider identifier.
 	 */
 	public static function apiKeySourceFor( string $provider ): string {
-		if ( '' !== self::constantValue( self::apiKeyConstantFor( $provider ) ) ) {
-			return self::SOURCE_CONSTANT;
-		}
-
-		return '' !== self::storedApiKeyFor( $provider ) ? self::SOURCE_STORED : self::SOURCE_NONE;
+		return self::hasApiKeyFor( $provider ) ? self::SOURCE_STORED : self::SOURCE_NONE;
 	}
 
 	/**
@@ -351,35 +320,16 @@ final class Settings {
 	}
 
 	/**
-	 * Reads the Telegram bot token: constant first, option as a fallback.
+	 * Reads the Telegram bot token from the settings screen.
 	 */
 	public static function telegramToken(): string {
-		$token = self::constantValue( self::TELEGRAM_CONSTANT );
-
-		return '' !== $token ? $token : trim( (string) ( self::all()['telegram_token'] ?? '' ) );
+		return trim( (string) ( self::all()['telegram_token'] ?? '' ) );
 	}
 
 	/**
-	 * Where the effective bot token comes from: `constant`, `stored` or `none`.
+	 * Where the bot token stands: `stored` or `none`.
 	 */
 	public static function telegramTokenSource(): string {
-		if ( '' !== self::constantValue( self::TELEGRAM_CONSTANT ) ) {
-			return self::SOURCE_CONSTANT;
-		}
-
-		return '' !== trim( (string) ( self::all()['telegram_token'] ?? '' ) ) ? self::SOURCE_STORED : self::SOURCE_NONE;
-	}
-
-	/**
-	 * Reads a constant when it exists and is not empty.
-	 *
-	 * @param string $name Constant name.
-	 */
-	private static function constantValue( string $name ): string {
-		if ( '' === $name || ! defined( $name ) ) {
-			return '';
-		}
-
-		return trim( (string) constant( $name ) );
+		return '' !== self::telegramToken() ? self::SOURCE_STORED : self::SOURCE_NONE;
 	}
 }

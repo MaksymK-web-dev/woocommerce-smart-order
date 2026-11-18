@@ -84,27 +84,15 @@ which is exactly what the first working version did: `No name (not provided)`,
 ### Configuration
 
 Everything a shop manager needs lives at **WooCommerce → Smart Order**: enable, provider,
-base URL, model, transport, group id, and the two credentials. Credentials can come from two
-places:
+base URL, model, transport, group id, the API key and the bot token. Everything is stored in
+the `wso_smart_order` option, so rotating a key is a form submit, not a deploy. A secret field
+never prints a stored value back: empty means *keep what is stored*.
 
-1. **`wp-config.php` constants** — outside the database, outside git, wins over the screen:
-
-```php
-define( 'WSO_OPENAI_API_KEY', 'sk-...' );      // or WSO_ANTHROPIC_API_KEY
-define( 'WSO_AI_API_KEY', 'AIza...' );        // Gemini and custom endpoints
-define( 'WSO_TELEGRAM_BOT_TOKEN', '123:AA...' );
-```
-
-2. **The settings screen** — stored in the `wso_smart_order` option. Rotating a key is a
-   form submit, not a deploy. The field never prints a stored value back: empty means
-   *keep what is stored*.
-
-Each secret shows where its effective value comes from (*not set* / *saved in the database* /
-*set in wp-config.php — the stored value is ignored*), and **Test connection** proves it
-before anything depends on it. The check is live but costs nothing: the provider's models
-listing authenticates the key, and Telegram's `getMe` + `getChat` confirm the token and that
-the bot can see the configured group. A key typed into the field is tested without saving
-first.
+The screen shows whether a provider already holds a key, and **Test connection** proves the
+value before anything depends on it. The check is live but costs nothing: the provider's
+models listing authenticates the key, and Telegram's `getMe` + `getChat` confirm the token
+and that the bot can see the configured group. A key typed into the field is tested as it is
+on screen, without saving first.
 
 ### Any model, not one model
 
@@ -223,7 +211,7 @@ What is enforced, and where:
 
 | Concern | Where it lives |
 | --- | --- |
-| API keys, bot token | file outside the web root, loaded as constants from `wp-config.php` |
+| API keys, bot token | managed on the settings screen, stored in the `wso_smart_order` option |
 | Webhook authenticity | HMAC-SHA256 of the raw body, compared in constant time |
 | Duplicate announcement | per-order claim in the workflow's static data |
 | Dashboard code editing | `DISALLOW_FILE_EDIT`, `DISALLOW_FILE_MODS` |
@@ -245,21 +233,16 @@ Two of these were real holes in this install, not hypothetical:
 - **The webhook accepted unsigned requests.** A `POST` to the webhook URL with any body
   created an order announcement for a customer who does not exist.
 
-Secrets are deliberately **not** in the database. `wp-config.php` loads
-`~/.config/wso/wp-secrets.php`, which defines `WSO_AI_API_KEY` and
-`WSO_TELEGRAM_BOT_TOKEN`; the settings screen then reports them as
-*set in wp-config.php* and refuses to store a typed key that the constant would shadow.
-The only settings left in the database are non-secret: provider, model, transport, group
-id.
+Credentials are managed from the settings screen and nowhere else: an owner opens
+**WooCommerce → Smart Order**, pastes the key and the bot token, and saves. No file
+editing, and no constant that could shadow the form. An earlier version also read
+`wp-config.php` constants and let them win over the screen, which meant an owner who
+pasted a fresh key still saw the old one in use — one source of truth is worth more
+than the extra option.
 
 The blocks this install needs in `wp-config.php`, before *stop editing*:
 
 ```php
-$wso_secrets = '/path/to/wp-secrets.php';   // outside the web root
-if ( is_readable( $wso_secrets ) ) {
-	require_once $wso_secrets;                                 // WSO_AI_API_KEY, WSO_TELEGRAM_BOT_TOKEN
-}
-
 define( 'DISALLOW_FILE_EDIT', true );
 define( 'DISALLOW_FILE_MODS', true );
 define( 'FORCE_SSL_ADMIN', true );

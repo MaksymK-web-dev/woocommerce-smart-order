@@ -159,19 +159,6 @@ final class SettingsTest extends TestCase {
 		self::assertSame( '123:stored', Settings::telegramToken() );
 	}
 
-	/**
-	 * The constant name follows the provider.
-	 */
-	public function testApiKeyConstantFollowsTheProvider(): void {
-		self::store( array( 'provider' => Settings::PROVIDER_OPENAI ) );
-		self::assertSame( 'WSO_OPENAI_API_KEY', Settings::apiKeyConstant() );
-
-		self::store( array( 'provider' => Settings::PROVIDER_ANTHROPIC ) );
-		self::assertSame( 'WSO_ANTHROPIC_API_KEY', Settings::apiKeyConstant() );
-
-		self::store( array( 'provider' => Settings::PROVIDER_GEMINI ) );
-		self::assertSame( 'WSO_AI_API_KEY', Settings::apiKeyConstant() );
-	}
 
 	/**
 	 * An unknown provider falls back to OpenAI instead of breaking the pipeline.
