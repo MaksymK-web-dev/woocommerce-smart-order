@@ -1,0 +1,55 @@
+# n8n for the WooCommerce Smart Order chain.
+#
+# Usage:
+#   docker compose -f n8n/docker-compose.yml up -d
+#   docker compose -f n8n/docker-compose.yml logs -f
+#
+# The environment file holds every secret and must live outside this repository:
+#   ~/.config/wso/n8n.env   (see .env.example for the variables)
+#
+#   export WSO_N8N_ENV_FILE=~/.config/wso/n8n.env   # or set it in the shell profile
+
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: unless-stopped
+    env_file:
+      # Fails with a readable message rather than silently reading the wrong file.
+      - ${WSO_N8N_ENV_FILE:?set WSO_N8N_ENV_FILE to the path of your n8n env file, e.g. ~/.config/wso/n8n.env}
+    environment:
+      # The workflow reads $env.* inside Code nodes, which is off by default.
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+      # Needed by the signature check: HMAC over the raw webhook body.
+      NODE_FUNCTION_ALLOW_BUILTIN: "crypto"
+      N8N_SECURE_COOKIE: "false"
+      GENERIC_TIMEZONE: Europe/Kyiv
+      TZ: Europe/Kyiv
+      # Keep the execution table bounded; a long-running install otherwise grows forever.
+      EXECUTIONS_DATA_PRUNE: "true"
+      EXECUTIONS_DATA_MAX_AGE: "336"
+      EXECUTIONS_DATA_SAVE_ON_SUCCESS: "all"
+      EXECUTIONS_DATA_SAVE_ON_ERROR: "all"
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_VERSION_NOTIFICATIONS_ENABLED: "false"
+    ports:
+      # Loopback only: the editor is not reachable from the network. Put a reverse
+      # proxy with TLS in front if it has to be.
+      - "127.0.0.1:5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:5678/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  n8n_data:
+    name: n8n_data

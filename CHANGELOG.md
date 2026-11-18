@@ -4,12 +4,34 @@
 
 - Repository scaffolding: MIT license, CI (lint on PHP 8.1–8.4, coding standards, tests,
   workflow JSON regeneration check), editorconfig.
+- **Webhook signature verification.** The n8n workflow recomputes the HMAC-SHA256 of the
+  raw request body with the store's webhook secret and compares it in constant time
+  before anything else runs. An unsigned or wrongly signed POST is rejected; previously
+  anyone who knew the URL could inject a fake order.
+- **Duplicate suppression.** A claim per order id in the workflow's static data stops a
+  repeated delivery from announcing the same order twice. The claim expires after ten
+  minutes, so a delivery that genuinely failed and was retried later still goes out.
+- **Retries.** The AI node retries once and degrades to a message saying the
+  classification failed; Telegram retries three times.
+- `n8n/docker-compose.yml`: restart `unless-stopped`, a healthcheck, log rotation,
+  execution pruning, the port bound to loopback only, and `NODE_FUNCTION_ALLOW_BUILTIN`
+  limited to `crypto` — without which the signature node cannot reach `require('crypto')`.
+- `N8N_ENCRYPTION_KEY` and `WC_WEBHOOK_SECRET` in `.env.example`, with the reason each is
+  required.
 
 ### Changed
 
 - The n8n AI node reads `AI_BASE_URL`, `AI_API_KEY` and `AI_MODEL` from the environment
   instead of a hardcoded `api.openai.com` URL, so one workflow runs on OpenAI, Gemini,
   Groq, DeepSeek or a local server. `OPENAI_API_KEY` is still honoured as a fallback.
+- The workflow reads the raw webhook body from `binary.data`: `rawBody` puts the untouched
+  bytes there, not in `json.body`, so the signature covers exactly what the store signed.
+
+### Fixed
+
+- `tools/wc-setup.php deliver <id> --root=…` read the `--root` flag as the webhook id and
+  failed with *Webhook not found*. Flags are now stripped before positional arguments are
+  read.
 
 ## [1.2.0] — 2026-11-18
 

@@ -56,8 +56,18 @@ function wso_smart_order_locate_wp_root( array $argv ): string {
 
 require_once wso_smart_order_locate_wp_root( $argv );
 
-$command  = $argv[1] ?? 'help';
-$argument = $argv[2] ?? '';
+// `--root=...` is a flag, not a positional argument. Leaving it in place made
+// `deliver 28 --root=...` read the flag as the webhook id and fail with
+// "Webhook not found".
+$arguments = array_values(
+	array_filter(
+		array_slice( $argv, 1 ),
+		static fn ( $value ): bool => ! str_starts_with( (string) $value, '--root=' )
+	)
+);
+
+$command  = $arguments[0] ?? 'help';
+$argument = $arguments[1] ?? '';
 
 if ( ! class_exists( 'WC_Webhook' ) ) {
 	fwrite( STDERR, "WooCommerce is not active.\n" );
@@ -193,7 +203,7 @@ switch ( $command ) {
 			exit( 1 );
 		}
 
-		$webhook = wc_get_webhook( (int) ( $argv[3] ?? 1 ) );
+		$webhook = wc_get_webhook( (int) ( $arguments[2] ?? 1 ) );
 		if ( ! $webhook ) {
 			fwrite( STDERR, "Webhook not found.\n" );
 			exit( 1 );
