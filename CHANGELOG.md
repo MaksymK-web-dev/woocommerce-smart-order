@@ -5,6 +5,12 @@
 - Repository scaffolding: MIT license, CI (lint on PHP 8.1–8.4, coding standards, tests,
   workflow JSON regeneration check), editorconfig.
 
+### Changed
+
+- The n8n AI node reads `AI_BASE_URL`, `AI_API_KEY` and `AI_MODEL` from the environment
+  instead of a hardcoded `api.openai.com` URL, so one workflow runs on OpenAI, Gemini,
+  Groq, DeepSeek or a local server. `OPENAI_API_KEY` is still honoured as a fallback.
+
 ## [1.2.0] — 2026-11-18
 
 ### Added

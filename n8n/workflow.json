@@ -22,7 +22,7 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "// Вузол 1: витягуємо потрібні поля із webhook-пейлоада WooCommerce.\nconst order = $json.body || $json;\nconst b = order.billing || {};\n\nconst name = [b.first_name, b.last_name].filter(Boolean).join(' ').trim()\n  || order.customer_name || 'Без імені';\nconst phone = (b.phone || '').trim();\nconst items = (order.line_items || []).map(li => `${li.name} (x${li.quantity})`);\nconst itemsText = items.length ? items.join(', ') : '—';\nconst totalText = order.total\n  ? `${Number(order.total).toFixed(2)} ${order.currency || 'UAH'}`\n  : '—';\nconst comment = (order.customer_note || '').trim();\n\nreturn [{\n  json: {\n    orderId: order.number || order.id || '—',\n    customer: name,\n    phone: phone || 'не вказано',\n    itemsText,\n    totalText,\n    comment,\n    hasComment: comment.length > 0,\n  },\n}];"
+        "jsCode": "// Node 1: pull the fields the message needs out of the webhook payload.\nconst order = $json.body || $json;\nconst b = order.billing || {};\n\nconst name = [b.first_name, b.last_name].filter(Boolean).join(' ').trim()\n  || order.customer_name || 'Без імені';\nconst phone = (b.phone || '').trim();\nconst items = (order.line_items || []).map(li => `${li.name} (x${li.quantity})`);\nconst itemsText = items.length ? items.join(', ') : '—';\nconst totalText = order.total\n  ? `${Number(order.total).toFixed(2)} ${order.currency || 'UAH'}`\n  : '—';\nconst comment = (order.customer_note || '').trim();\n\nreturn [{\n  json: {\n    orderId: order.number || order.id || '—',\n    customer: name,\n    phone: phone || 'не вказано',\n    itemsText,\n    totalText,\n    comment,\n    hasComment: comment.length > 0,\n  },\n}];"
       },
       "id": "b1a1c0de-0001-4000-8000-000000000002",
       "name": "1. Extract order",
@@ -36,13 +36,13 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://api.openai.com/v1/chat/completions",
+        "url": "={{ $env.AI_BASE_URL || \"https://api.openai.com/v1\" }}/chat/completions",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "Authorization",
-              "value": "=Bearer {{ $env.OPENAI_API_KEY }}"
+              "value": "=Bearer {{ $env.AI_API_KEY || $env.OPENAI_API_KEY }}"
             },
             {
               "name": "Content-Type",
@@ -52,7 +52,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({\n  model: $env.OPENAI_MODEL || 'gpt-4o-mini',\n  temperature: 0,\n  response_format: { type: 'json_object' },\n  messages: [\n    { role: 'system', content: \"Ти — асистент менеджера інтернет-магазину. Отримуєш коментар покупця до замовлення. Визнач, чи містить коментар термінове прохання про час або спосіб доставки (наприклад: «доставка після 18:00», «зателефонувати за годину», «курʼєр до 12:00», «самовивіз сьогодні», «не дзвоніть, пишіть у телеграм»). Поверни СУВОРО JSON без пояснень: {\\\"urgent\\\": true|false, \\\"note\\\": \\\"коротке формулювання вимоги українською, або порожній рядок\\\"}\" },\n    { role: 'user', content: 'Коментар покупця: ' + JSON.stringify($json.comment) }\n  ]\n}) }}",
+        "jsonBody": "={{ JSON.stringify({\n  model: $env.AI_MODEL || 'gpt-4o-mini',\n  temperature: 0,\n  response_format: { type: 'json_object' },\n  messages: [\n    { role: 'system', content: \"Ти — асистент менеджера інтернет-магазину. Отримуєш коментар покупця до замовлення. Визнач, чи містить коментар термінове прохання про час або спосіб доставки (наприклад: «доставка після 18:00», «зателефонувати за годину», «курʼєр до 12:00», «самовивіз сьогодні», «не дзвоніть, пишіть у телеграм»). Поверни СУВОРО JSON без пояснень: {\\\"urgent\\\": true|false, \\\"note\\\": \\\"коротке формулювання вимоги українською, або порожній рядок\\\"}\" },\n    { role: 'user', content: 'Коментар покупця: ' + JSON.stringify($json.comment) }\n  ]\n}) }}",
         "options": {
           "timeout": 30000,
           "response": {
@@ -75,7 +75,7 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "// Вузол 3: розбираємо відповідь ШІ і збираємо HTML-повідомлення для Telegram.\nconst d = $('1. Extract order').first().json;\n\nlet aiOk = false;\nlet urgent = false;\nlet note = '';\ntry {\n  const ai = $('2. AI urgency').first().json;\n  let content = ai?.choices?.[0]?.message?.content;\n  if (typeof content === 'string' && content.trim()) {\n    content = content.replace(/^\\`\\`\\`(?:json)?/i, '').replace(/\\`\\`\\`$/, '').trim();\n    const parsed = JSON.parse(content);\n    urgent = parsed.urgent === true;\n    note = String(parsed.note ?? '').trim();\n    aiOk = true;\n  }\n} catch (e) {\n  aiOk = false;\n}\n\nconst esc = (s) => String(s)\n  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n\nconst lines = [];\nlines.push(`🛒 <b>Нове замовлення #${esc(d.orderId)}</b>`);\nlines.push('');\nlines.push(`👤 Клієнт: <b>${esc(d.customer)}</b> (${esc(d.phone)})`);\nlines.push('');\nlines.push(`📦 Товари: ${esc(d.itemsText)} — <b>${esc(d.totalText)}</b>`);\n\nif (d.hasComment) {\n  lines.push('');\n  lines.push(`💬 Коментар: «${esc(d.comment)}»`);\n  if (urgent) {\n    lines.push('');\n    lines.push(`⚠️ ШІ-позначка: «${esc(note || d.comment)}»`);\n  } else if (aiOk) {\n    lines.push('', '✅ ШІ: термінових вимог щодо доставки не знайдено');\n  } else {\n    lines.push('', '⚠️ ШІ недоступний — перевірте коментар вручну');\n  }\n}\n\nreturn [{\n  json: {\n    ...d,\n    aiOk,\n    urgent,\n    note,\n    telegramText: lines.join('\\n'),\n  },\n}];"
+        "jsCode": "// Node 3: read the AI answer and build the HTML message for Telegram.\nconst d = $('1. Extract order').first().json;\n\nlet aiOk = false;\nlet urgent = false;\nlet note = '';\ntry {\n  const ai = $('2. AI urgency').first().json;\n  let content = ai?.choices?.[0]?.message?.content;\n  if (typeof content === 'string' && content.trim()) {\n    content = content.replace(/^\\`\\`\\`(?:json)?/i, '').replace(/\\`\\`\\`$/, '').trim();\n    const parsed = JSON.parse(content);\n    urgent = parsed.urgent === true;\n    note = String(parsed.note ?? '').trim();\n    aiOk = true;\n  }\n} catch (e) {\n  aiOk = false;\n}\n\nconst esc = (s) => String(s)\n  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n\nconst lines = [];\nlines.push(`🛒 <b>Нове замовлення #${esc(d.orderId)}</b>`);\nlines.push('');\nlines.push(`👤 Клієнт: <b>${esc(d.customer)}</b> (${esc(d.phone)})`);\nlines.push('');\nlines.push(`📦 Товари: ${esc(d.itemsText)} — <b>${esc(d.totalText)}</b>`);\n\nif (d.hasComment) {\n  lines.push('');\n  lines.push(`💬 Коментар: «${esc(d.comment)}»`);\n  if (urgent) {\n    lines.push('');\n    lines.push(`⚠️ ШІ-позначка: «${esc(note || d.comment)}»`);\n  } else if (aiOk) {\n    lines.push('', '✅ ШІ: термінових вимог щодо доставки не знайдено');\n  } else {\n    lines.push('', '⚠️ ШІ недоступний — перевірте коментар вручну');\n  }\n}\n\nreturn [{\n  json: {\n    ...d,\n    aiOk,\n    urgent,\n    note,\n    telegramText: lines.join('\\n'),\n  },\n}];"
       },
       "id": "b1a1c0de-0001-4000-8000-000000000004",
       "name": "3. Build message",

@@ -150,8 +150,19 @@ visually: webhook → extract → LLM classification → Telegram.
 `wp-content/mu-plugins/wso-local-webhook-transport.php` is the one local-only shim n8n
 needs — see below.
 
+The AI node takes its endpoint, key and model from the environment, so the same workflow
+runs on OpenAI, Gemini, Groq, DeepSeek or a local server — the same "a provider is a base
+URL plus a model" idea as the plugin:
+
 ```bash
-docker run -d --name n8n -p 5678:5678 --env-file .env \
+# .env.example lists every variable; keep the filled copy outside the web root.
+AI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+AI_API_KEY=AIza...
+AI_MODEL=gemini-2.5-flash
+```
+
+```bash
+docker run -d --name n8n -p 5678:5678 --env-file ~/.config/wso/n8n.env \
   -e N8N_SECURE_COOKIE=false -e N8N_BLOCK_ENV_ACCESS_IN_NODE=false \
   -v n8n_data:/home/node/.n8n n8nio/n8n:latest
 
@@ -230,15 +241,18 @@ Verified on a local WordPress 7.1.4 + WooCommerce 11.3.0 + PHP 8.4 install:
   `order.created` webhook and stays silent on every other screen;
 - coding standards clean under WordPress rules, adapted for PSR-4 as documented in
   `phpcs.xml.dist`;
-- n8n chain: order → Action Scheduler → webhook delivered → execution recorded, nodes 1
-  and 3 producing the expected output.
+- **the n8n chain ran end to end** against Gemini: order → Action Scheduler → webhook →
+  extract → Gemini (`gemini-2.5-flash`, `finish_reason: stop`) → Telegram
+  `ok: true`, `message_id: 20` in «Test Group». A comment with a delivery-time request
+  produced «⚠️ ШІ-позначка», a compliment produced «✅ ШІ: термінових вимог щодо
+  доставки не знайдено».
 
 Not verified — stated rather than implied:
 
-- the n8n workflow has not been run against a live model with the final credentials; the
-  plugin pipeline was, and the two share the same prompt and parsing contract;
 - no webhook signature is verified on the n8n path, so an unsigned POST would be accepted
   by the workflow.
+- `tools/wc-setup.php deliver <id> --root=…` misreads the flag as a webhook id; use
+  `WSO_WP_ROOT` for that command until it is fixed.
 
 ## Known gaps
 

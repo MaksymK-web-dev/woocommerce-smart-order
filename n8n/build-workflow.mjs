@@ -1,5 +1,5 @@
 // Builds the n8n workflow JSON for the WooCommerce → AI → Telegram chain.
-// Run: node .codewhale/n8n/build-workflow.mjs
+// Run: node n8n/build-workflow.mjs
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path';
 const here = dirname(fileURLToPath(import.meta.url));
 
 const extractCode = `
-// Вузол 1: витягуємо потрібні поля із webhook-пейлоада WooCommerce.
+// Node 1: pull the fields the message needs out of the webhook payload.
 const order = $json.body || $json;
 const b = order.billing || {};
 
@@ -35,7 +35,7 @@ return [{
 `.trim();
 
 const buildMessageCode = `
-// Вузол 3: розбираємо відповідь ШІ і збираємо HTML-повідомлення для Telegram.
+// Node 3: read the AI answer and build the HTML message for Telegram.
 const d = $('1. Extract order').first().json;
 
 let aiOk = false;
@@ -100,7 +100,7 @@ const systemPrompt = [
 ].join(' ');
 
 const aiBody = `={{ JSON.stringify({
-  model: $env.OPENAI_MODEL || 'gpt-4o-mini',
+  model: $env.AI_MODEL || 'gpt-4o-mini',
   temperature: 0,
   response_format: { type: 'json_object' },
   messages: [
@@ -148,11 +148,12 @@ const workflow = {
     {
       parameters: {
         method: 'POST',
-        url: 'https://api.openai.com/v1/chat/completions',
+        // Any provider that speaks OpenAI's protocol: set AI_BASE_URL.
+        url: '={{ $env.AI_BASE_URL || "https://api.openai.com/v1" }}/chat/completions',
         sendHeaders: true,
         headerParameters: {
           parameters: [
-            { name: 'Authorization', value: '=Bearer {{ $env.OPENAI_API_KEY }}' },
+            { name: 'Authorization', value: '=Bearer {{ $env.AI_API_KEY || $env.OPENAI_API_KEY }}' },
             { name: 'Content-Type', value: 'application/json' },
           ],
         },
