@@ -307,8 +307,25 @@ final class SettingsPage implements HookRegistrar {
 
 		$keys = is_array( $current['api_keys'] ?? null ) ? $current['api_keys'] : array();
 
+		// A wp-config.php constant wins over anything stored, so saving a typed key
+		// would put a secret in the database that is never used. Say so instead of
+		// storing it silently.
+		$key_constant  = Settings::apiKeyConstantFor( $provider );
+		$key_is_locked = defined( $key_constant ) && '' !== trim( (string) constant( $key_constant ) );
+
 		if ( ! empty( $input['api_key_clear'] ) ) {
 			unset( $keys[ $provider ] );
+		} elseif ( '' !== $typed_key && $key_is_locked ) {
+			add_settings_error(
+				Settings::OPTION,
+				'wso_key_from_constant',
+				sprintf(
+					/* translators: %s: constant name. */
+					__( 'The key you typed was not saved: %s is defined in wp-config.php and takes priority. Remove the constant to manage the key here.', 'woocommerce-smart-order' ),
+					$key_constant
+				),
+				'warning'
+			);
 		} elseif ( '' !== $typed_key ) {
 			$keys[ $provider ] = sanitize_text_field( $typed_key );
 		}
@@ -323,10 +340,23 @@ final class SettingsPage implements HookRegistrar {
 				: Settings::MODE_LOG,
 			'telegram_chat'  => $this->sanitizeChatId( $telegram_chat ),
 			'api_keys'       => array_filter( $keys, static fn ( $value ): bool => is_scalar( $value ) && '' !== trim( (string) $value ) ),
-			'telegram_token' => '' !== $telegram_token
+			'telegram_token' => '' !== $telegram_token && ! self::tokenIsLocked()
 				? sanitize_text_field( $telegram_token )
 				: (string) ( $current['telegram_token'] ?? '' ),
 		);
+
+		if ( '' !== $telegram_token && self::tokenIsLocked() ) {
+			add_settings_error(
+				Settings::OPTION,
+				'wso_token_from_constant',
+				sprintf(
+					/* translators: %s: constant name. */
+					__( 'The bot token you typed was not saved: %s is defined in wp-config.php and takes priority.', 'woocommerce-smart-order' ),
+					Settings::TELEGRAM_CONSTANT
+				),
+				'warning'
+			);
+		}
 
 		if ( ! array_key_exists( 'model', $input ) && is_scalar( $current['model'] ?? null ) ) {
 			$clean['model'] = (string) $current['model'];
@@ -343,6 +373,14 @@ final class SettingsPage implements HookRegistrar {
 		}
 
 		return $clean;
+	}
+
+	/**
+	 * Whether the bot token is pinned by a wp-config.php constant.
+	 */
+	private static function tokenIsLocked(): bool {
+		return defined( Settings::TELEGRAM_CONSTANT )
+			&& '' !== trim( (string) constant( Settings::TELEGRAM_CONSTANT ) );
 	}
 
 	/**

@@ -44,6 +44,7 @@
 !/wp-content/mu-plugins/
 /wp-content/mu-plugins/*
 !/wp-content/mu-plugins/wso-local-webhook-transport.php
+!/wp-content/mu-plugins/wso-login-hardening.php
 
 # ─── Secrets: never, under any path ─────────────────────────────────
 .env
@@ -61,6 +62,10 @@
 /wp-*.php
 /xmlrpc.php
 /.osp/
+!/.osp/
+/.osp/*
+!/.osp/nginx/
+!/.osp/nginx/*.conf
 /.idea/
 
 # ─── OS and editor noise ────────────────────────────────────────────

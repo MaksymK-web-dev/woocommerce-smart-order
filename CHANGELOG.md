@@ -33,6 +33,24 @@
   failed with *Webhook not found*. Flags are now stripped before positional arguments are
   read.
 
+### Security
+
+- **Dotfiles are no longer served.** `.git/config` and `.codewhale/handoff.md` answered
+  `HTTP 200`, which exposed the whole commit history and the deployment notes. The rules
+  are in `.osp/nginx/woocommerce-smartorder.loc.conf`, the file OSPanel includes inside
+  the host block, so they survive regeneration of `nginx.conf`. Both now answer `403`.
+- **PHP cannot run in `wp-content/uploads`**: `*.php`, `*.phtml`, `*.phar` are denied at
+  the web server, and directory listing is off.
+- **Secrets left the database.** `wp-config.php` loads `~/.config/wso/wp-secrets.php`
+  from outside the web root and defines `WSO_AI_API_KEY` / `WSO_TELEGRAM_BOT_TOKEN`. The
+  option now holds only non-secret settings.
+- **`DISALLOW_FILE_EDIT` and `DISALLOW_FILE_MODS`** are set, so a compromised admin
+  account cannot edit plugin code from the dashboard.
+- **`FORCE_SSL_ADMIN`** is set.
+- **Username enumeration closed**: "unknown username" and "wrong password" now produce
+  the same message (`wp-content/mu-plugins/wso-login-hardening.php`).
+- The settings screen refuses a typed key when a `wp-config.php` constant shadows it,
+  instead of storing a secret that would never be used.
 ## [1.2.0] — 2026-11-18
 
 ### Added

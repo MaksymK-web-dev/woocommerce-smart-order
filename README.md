@@ -217,6 +217,54 @@ allows exactly that host, port and `/webhook/` path — parsed from the URL, not
 substring — and nothing else: `http://127.0.0.1:9999/other` and `http://example.com:5678/`
 are still refused. A hosted n8n needs none of it.
 
+## Security
+
+What is enforced, and where:
+
+| Concern | Where it lives |
+| --- | --- |
+| API keys, bot token | file outside the web root, loaded as constants from `wp-config.php` |
+| Webhook authenticity | HMAC-SHA256 of the raw body, compared in constant time |
+| Duplicate announcement | per-order claim in the workflow's static data |
+| Dashboard code editing | `DISALLOW_FILE_EDIT`, `DISALLOW_FILE_MODS` |
+| Admin over TLS | `FORCE_SSL_ADMIN` |
+| Username enumeration | one neutral message for every failed login |
+| Dotfiles (`.git`, `.codewhale`, `.env`) | `deny all` in the host's nginx config |
+| PHP in `wp-content/uploads` | `deny all` for `*.php`, `*.phtml`, `*.phar` |
+| n8n editor | port bound to `127.0.0.1`, restart policy, healthcheck |
+| Execution table growth | n8n pruning, 14 days |
+| Log growth | Docker log rotation, 10 MB × 3 |
+
+Two of these were real holes in this install, not hypothetical:
+
+- **`.git/config` and `.codewhale/handoff.md` answered `HTTP 200`.** Anyone on the
+  network could fetch the whole repository history and the deployment notes. The rules
+  live in `.osp/nginx/woocommerce-smartorder.loc.conf` — OSPanel includes that file
+  inside the host block, so they survive regeneration of `nginx.conf`, which is
+  generated and must not be edited by hand. Both now answer `403`.
+- **The webhook accepted unsigned requests.** A `POST` to the webhook URL with any body
+  created an order announcement for a customer who does not exist.
+
+Secrets are deliberately **not** in the database. `wp-config.php` loads
+`~/.config/wso/wp-secrets.php`, which defines `WSO_AI_API_KEY` and
+`WSO_TELEGRAM_BOT_TOKEN`; the settings screen then reports them as
+*set in wp-config.php* and refuses to store a typed key that the constant would shadow.
+The only settings left in the database are non-secret: provider, model, transport, group
+id.
+
+The blocks this install needs in `wp-config.php`, before *stop editing*:
+
+```php
+$wso_secrets = '/path/to/wp-secrets.php';   // outside the web root
+if ( is_readable( $wso_secrets ) ) {
+	require_once $wso_secrets;                                 // WSO_AI_API_KEY, WSO_TELEGRAM_BOT_TOKEN
+}
+
+define( 'DISALLOW_FILE_EDIT', true );
+define( 'DISALLOW_FILE_MODS', true );
+define( 'FORCE_SSL_ADMIN', true );
+```
+
 ## Getting started
 
 ```bash
