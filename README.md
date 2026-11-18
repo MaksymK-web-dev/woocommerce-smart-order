@@ -121,7 +121,7 @@ With transport set to *Log only* the pipeline is fully observable in
 **WooCommerce → Status → Logs** (`woocommerce-smart-order` source) without any credentials —
 that is the default, so a fresh install never fails silently.
 
-![The settings screen: per-provider key status, and both live checks passing](docs/screenshots/settings.png)
+![The settings screen: per-provider key status and a live check. Identifiers are masked.](docs/screenshots/settings.png)
 
 ### One chain per order
 
