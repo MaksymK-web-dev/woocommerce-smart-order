@@ -11,6 +11,10 @@ namespace WSO\SmartOrder\Config;
 
 /**
  * Typed access to the single `wso_smart_order` option.
+ *
+ * API keys are stored per provider. A single shared key is the reason a provider
+ * switch used to send the previous provider's key to the new one, which fails with
+ * an error about the wrong service.
  */
 final class Settings {
 
@@ -18,6 +22,8 @@ final class Settings {
 
 	public const PROVIDER_OPENAI    = 'openai';
 	public const PROVIDER_ANTHROPIC = 'anthropic';
+	public const PROVIDER_GEMINI    = 'gemini';
+	public const PROVIDER_CUSTOM    = 'custom';
 
 	public const MODE_TELEGRAM = 'telegram';
 	public const MODE_LOG      = 'log';
@@ -32,23 +38,90 @@ final class Settings {
 	public const TELEGRAM_CONSTANT = 'WSO_TELEGRAM_BOT_TOKEN';
 
 	/**
-	 * Returns all stored settings merged with defaults.
+	 * Base URL for each provider. A provider is a URL plus a model name, not a class:
+	 * every one of these speaks the same `/chat/completions` protocol except Anthropic.
+	 *
+	 * @var array<string, string>
+	 */
+	private const BASE_URLS = array(
+		self::PROVIDER_OPENAI    => 'https://api.openai.com/v1',
+		self::PROVIDER_GEMINI    => 'https://generativelanguage.googleapis.com/v1beta/openai',
+		self::PROVIDER_ANTHROPIC => 'https://api.anthropic.com/v1',
+		self::PROVIDER_CUSTOM    => '',
+	);
+
+	/**
+	 * Default model for each provider.
+	 *
+	 * @var array<string, string>
+	 */
+	private const DEFAULT_MODELS = array(
+		self::PROVIDER_OPENAI    => 'gpt-4o-mini',
+		self::PROVIDER_ANTHROPIC => 'claude-3-5-haiku-latest',
+		self::PROVIDER_GEMINI    => 'gemini-2.5-flash',
+		self::PROVIDER_CUSTOM    => 'gpt-4o-mini',
+	);
+
+	/**
+	 * Name of the wp-config.php constant holding a provider's key, when the site keeps one there.
+	 *
+	 * @var array<string, string>
+	 */
+	private const KEY_CONSTANTS = array(
+		self::PROVIDER_OPENAI    => 'WSO_OPENAI_API_KEY',
+		self::PROVIDER_ANTHROPIC => 'WSO_ANTHROPIC_API_KEY',
+		self::PROVIDER_GEMINI    => 'WSO_AI_API_KEY',
+		self::PROVIDER_CUSTOM    => 'WSO_AI_API_KEY',
+	);
+
+	/**
+	 * Default values, also used as the Settings API default.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function defaults(): array {
+		return array(
+			'enabled'       => false,
+			'provider'      => self::PROVIDER_OPENAI,
+			'model'         => self::DEFAULT_MODELS[ self::PROVIDER_OPENAI ],
+			'base_url'      => '',
+			'notify_mode'   => self::MODE_LOG,
+			'telegram_chat' => '',
+			'api_keys'      => array(),
+		);
+	}
+
+	/**
+	 * Stored settings merged with defaults.
+	 *
+	 * The legacy single `api_key` is read into the map of the provider it was stored
+	 * with, so an existing install keeps working without a migration script.
 	 *
 	 * @return array<string, mixed>
 	 */
 	public static function all(): array {
 		$stored = get_option( self::OPTION, array() );
+		$stored = is_array( $stored ) ? $stored : array();
 
-		return array_merge(
-			array(
-				'enabled'       => false,
-				'provider'      => self::PROVIDER_OPENAI,
-				'model'         => 'gpt-4o-mini',
-				'notify_mode'   => self::MODE_LOG,
-				'telegram_chat' => '',
-			),
-			is_array( $stored ) ? $stored : array()
-		);
+		$merged = array_merge( self::defaults(), $stored );
+
+		$keys = isset( $merged['api_keys'] ) && is_array( $merged['api_keys'] ) ? $merged['api_keys'] : array();
+
+		if ( array() === $keys && isset( $stored['api_key'] ) && is_scalar( $stored['api_key'] ) ) {
+			$legacy = trim( (string) $stored['api_key'] );
+
+			if ( '' !== $legacy ) {
+				$keys[ self::normalizeProvider( (string) ( $merged['provider'] ?? '' ) ) ] = $legacy;
+			}
+		}
+
+		$merged['api_keys'] = $keys;
+
+		// The legacy field is not carried forward: writing it again would re-seed
+		// every provider with the same key.
+		unset( $merged['api_key'] );
+
+		return $merged;
 	}
 
 	/**
@@ -62,20 +135,130 @@ final class Settings {
 	 * Selected AI provider identifier.
 	 */
 	public static function provider(): string {
-		$provider = (string) ( self::all()['provider'] ?? self::PROVIDER_OPENAI );
+		return self::normalizeProvider( (string) ( self::all()['provider'] ?? '' ) );
+	}
 
-		return in_array( $provider, array( self::PROVIDER_OPENAI, self::PROVIDER_ANTHROPIC ), true )
-			? $provider
-			: self::PROVIDER_OPENAI;
+	/**
+	 * Provider identifiers the settings screen offers.
+	 *
+	 * @return string[]
+	 */
+	public static function providers(): array {
+		return array_keys( self::BASE_URLS );
+	}
+
+	/**
+	 * Whether a string is a provider this plugin knows.
+	 *
+	 * @param string $provider Candidate.
+	 */
+	public static function isProvider( string $provider ): bool {
+		return array_key_exists( $provider, self::BASE_URLS );
+	}
+
+	/**
+	 * Maps an unknown or empty provider onto the default one.
+	 *
+	 * @param string $provider Candidate.
+	 */
+	public static function normalizeProvider( string $provider ): string {
+		return self::isProvider( $provider ) ? $provider : self::PROVIDER_OPENAI;
+	}
+
+	/**
+	 * Whether a provider speaks the Anthropic messages protocol.
+	 *
+	 * @param string $provider Provider identifier.
+	 */
+	public static function usesAnthropicProtocolFor( string $provider ): bool {
+		return self::PROVIDER_ANTHROPIC === $provider;
+	}
+
+	/**
+	 * Whether the selected provider speaks the Anthropic messages protocol.
+	 */
+	public static function usesAnthropicProtocol(): bool {
+		return self::usesAnthropicProtocolFor( self::provider() );
+	}
+
+	/**
+	 * Base URL a provider uses when nothing overrides it.
+	 *
+	 * @param string $provider Provider identifier.
+	 */
+	public static function defaultBaseUrl( string $provider ): string {
+		return rtrim( self::BASE_URLS[ self::normalizeProvider( $provider ) ] ?? '', '/' );
+	}
+
+	/**
+	 * Base URL actually used: the stored one for a custom endpoint, the provider's own otherwise.
+	 *
+	 * @param string $provider    Provider identifier.
+	 * @param string $customValue Stored custom base URL.
+	 */
+	public static function baseUrlFor( string $provider, string $customValue ): string {
+		$provider = self::normalizeProvider( $provider );
+
+		if ( self::PROVIDER_CUSTOM !== $provider ) {
+			return self::defaultBaseUrl( $provider );
+		}
+
+		$custom = rtrim( trim( $customValue ), '/' );
+
+		return '' !== $custom ? $custom : self::defaultBaseUrl( self::PROVIDER_OPENAI );
+	}
+
+	/**
+	 * Base URL without a trailing slash, for the selected provider.
+	 */
+	public static function baseUrl(): string {
+		return self::baseUrlFor( self::provider(), (string) ( self::all()['base_url'] ?? '' ) );
+	}
+
+	/**
+	 * Default model for a provider.
+	 *
+	 * @param string $provider Provider identifier.
+	 */
+	public static function defaultModelFor( string $provider ): string {
+		return self::DEFAULT_MODELS[ self::normalizeProvider( $provider ) ] ?? self::DEFAULT_MODELS[ self::PROVIDER_OPENAI ];
+	}
+
+	/**
+	 * Model to use for a provider, given a stored name.
+	 *
+	 * A name carried over from another provider is replaced: sending `gpt-4o-mini` to
+	 * Gemini fails with a confusing "model not found".
+	 *
+	 * @param string $provider Provider identifier.
+	 * @param string $stored   Stored model name.
+	 */
+	public static function modelFor( string $provider, string $stored ): string {
+		$provider = self::normalizeProvider( $provider );
+		$stored   = trim( $stored );
+
+		if ( '' === $stored ) {
+			return self::defaultModelFor( $provider );
+		}
+
+		$is_foreign_default = in_array( $stored, self::DEFAULT_MODELS, true )
+			&& self::defaultModelFor( $provider ) !== $stored;
+
+		return $is_foreign_default ? self::defaultModelFor( $provider ) : $stored;
 	}
 
 	/**
 	 * Model name for the selected provider.
 	 */
 	public static function model(): string {
-		$model = trim( (string) ( self::all()['model'] ?? '' ) );
+		return self::modelFor( self::provider(), (string) ( self::all()['model'] ?? '' ) );
+	}
 
-		return '' !== $model ? $model : 'gpt-4o-mini';
+	/**
+	 * Default model for the selected provider.
+	 */
+	public static function defaultModel(): string {
+		return self::defaultModelFor( self::provider() );
 	}
 
 	/**
@@ -95,30 +278,76 @@ final class Settings {
 	}
 
 	/**
-	 * Name of the wp-config.php constant that overrides the stored AI key.
+	 * Name of the wp-config.php constant that can hold a provider's key.
+	 *
+	 * @param string $provider Provider identifier.
+	 */
+	public static function apiKeyConstantFor( string $provider ): string {
+		return self::KEY_CONSTANTS[ self::normalizeProvider( $provider ) ] ?? 'WSO_AI_API_KEY';
+	}
+
+	/**
+	 * Name of the wp-config.php constant for the selected provider.
 	 */
 	public static function apiKeyConstant(): string {
-		return self::PROVIDER_ANTHROPIC === self::provider() ? 'WSO_ANTHROPIC_API_KEY' : 'WSO_OPENAI_API_KEY';
+		return self::apiKeyConstantFor( self::provider() );
 	}
 
 	/**
-	 * Reads the AI key: constant first, option as a fallback for local testing.
+	 * Key stored for one provider.
+	 *
+	 * @param string $provider Provider identifier.
+	 */
+	public static function storedApiKeyFor( string $provider ): string {
+		$keys = self::all()['api_keys'];
+		$key  = $keys[ self::normalizeProvider( $provider ) ] ?? '';
+
+		return is_scalar( $key ) ? trim( (string) $key ) : '';
+	}
+
+	/**
+	 * Key stored for the selected provider.
+	 */
+	public static function storedApiKey(): string {
+		return self::storedApiKeyFor( self::provider() );
+	}
+
+	/**
+	 * Effective key for a provider: the constant first, the stored value second.
+	 *
+	 * @param string $provider Provider identifier.
+	 */
+	public static function apiKeyFor( string $provider ): string {
+		$constant = self::constantValue( self::apiKeyConstantFor( $provider ) );
+
+		return '' !== $constant ? $constant : self::storedApiKeyFor( $provider );
+	}
+
+	/**
+	 * Effective key for the selected provider.
 	 */
 	public static function apiKey(): string {
-		$key = self::constantValue( self::apiKeyConstant() );
-
-		return '' !== $key ? $key : trim( (string) ( self::all()['api_key'] ?? '' ) );
+		return self::apiKeyFor( self::provider() );
 	}
 
 	/**
-	 * Where the effective AI key comes from: `constant`, `stored` or `none`.
+	 * Where a provider's effective key comes from: `constant`, `stored` or `none`.
+	 *
+	 * @param string $provider Provider identifier.
 	 */
-	public static function apiKeySource(): string {
-		if ( '' !== self::constantValue( self::apiKeyConstant() ) ) {
+	public static function apiKeySourceFor( string $provider ): string {
+		if ( '' !== self::constantValue( self::apiKeyConstantFor( $provider ) ) ) {
 			return self::SOURCE_CONSTANT;
 		}
 
-		return '' !== trim( (string) ( self::all()['api_key'] ?? '' ) ) ? self::SOURCE_STORED : self::SOURCE_NONE;
+		return '' !== self::storedApiKeyFor( $provider ) ? self::SOURCE_STORED : self::SOURCE_NONE;
+	}
+
+	/**
+	 * Where the selected provider's key comes from.
+	 */
+	public static function apiKeySource(): string {
+		return self::apiKeySourceFor( self::provider() );
 	}
 
 	/**
@@ -147,25 +376,10 @@ final class Settings {
 	 * @param string $name Constant name.
 	 */
 	private static function constantValue( string $name ): string {
-		if ( ! defined( $name ) ) {
+		if ( '' === $name || ! defined( $name ) ) {
 			return '';
 		}
 
 		return trim( (string) constant( $name ) );
-	}
-
-	/**
-	 * Default values for the settings screen.
-	 *
-	 * @return array<string, mixed>
-	 */
-	public static function defaults(): array {
-		return array(
-			'enabled'       => false,
-			'provider'      => self::PROVIDER_OPENAI,
-			'model'         => 'gpt-4o-mini',
-			'notify_mode'   => self::MODE_LOG,
-			'telegram_chat' => '',
-		);
 	}
 }

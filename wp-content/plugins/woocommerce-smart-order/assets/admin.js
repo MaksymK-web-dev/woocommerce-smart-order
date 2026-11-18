@@ -1,5 +1,8 @@
 /**
  * "Test connection" buttons on the Smart Order settings screen.
+ *
+ * The whole form travels with the request: the check has to describe the
+ * configuration currently on screen, not the one last saved.
  */
 ( function () {
 	'use strict';
@@ -23,24 +26,35 @@
 	}
 
 	/**
+	 * Builds the request body from the form the button belongs to.
+	 *
+	 * @param {HTMLElement} button Clicked button.
+	 * @param {string}      target Check to run.
+	 * @return {FormData} Request body.
+	 */
+	function bodyFor( button, target ) {
+		var form = button.closest( 'form' );
+		var body = form ? new FormData( form ) : new FormData();
+
+		body.append( 'action', config.action );
+		body.append( 'nonce', config.nonce );
+		body.append( 'target', target );
+
+		return body;
+	}
+
+	/**
 	 * Posts one check and renders the answer.
 	 *
 	 * @param {HTMLElement} button Clicked button.
 	 */
 	function check( button ) {
 		var target = button.getAttribute( 'data-target' );
-		var field = document.getElementById( button.getAttribute( 'data-field' ) );
 		var output = document.querySelector( '.wso-check-result[data-target="' + target + '"]' );
 
 		if ( ! output ) {
 			return;
 		}
-
-		var body = new FormData();
-		body.append( 'action', config.action );
-		body.append( 'nonce', config.nonce );
-		body.append( 'target', target );
-		body.append( 'value', field ? field.value : '' );
 
 		button.disabled = true;
 		report( output, config.strings.checking, true );
@@ -48,7 +62,7 @@
 		fetch( config.ajaxUrl, {
 			method: 'POST',
 			credentials: 'same-origin',
-			body: body,
+			body: bodyFor( button, target ),
 		} )
 			.then( function ( response ) {
 				return response.json();

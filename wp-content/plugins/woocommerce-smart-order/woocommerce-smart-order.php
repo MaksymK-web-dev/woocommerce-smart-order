@@ -3,7 +3,7 @@
  * Plugin Name:       WooCommerce Smart Order
  * Plugin URI:        https://github.com/MaksymK-web-dev/woocommerce-smart-order
  * Description:       Classifies the free-form customer comment on a new order for delivery-time requests and notifies the manager's Telegram group.
- * Version:           1.1.0
+ * Version:           1.2.0
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Maksym Krokhal
@@ -26,7 +26,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 define( 'WSO_SMART_ORDER_FILE', __FILE__ );
 define( 'WSO_SMART_ORDER_DIR', __DIR__ );
-define( 'WSO_SMART_ORDER_VERSION', '1.1.0' );
+define( 'WSO_SMART_ORDER_VERSION', '1.2.0' );
 
 require_once __DIR__ . '/autoload.php';
 

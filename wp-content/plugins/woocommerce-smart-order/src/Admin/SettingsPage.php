@@ -9,14 +9,18 @@ declare( strict_types = 1 );
 
 namespace WSO\SmartOrder\Admin;
 
+use WSO\SmartOrder\Config\Draft;
 use WSO\SmartOrder\Config\Settings;
 use WSO\SmartOrder\Contract\HookRegistrar;
 use WSO\SmartOrder\Support\CheckResult;
+use WSO\SmartOrder\Support\Url;
 
 /**
  * WooCommerce → Smart Order settings screen.
  *
- * Secrets are never printed: an option fallback renders as an empty field.
+ * Secrets are never printed: an option fallback renders as an empty field. "Test
+ * connection" submits the whole form, so it checks the configuration on screen
+ * rather than the one last saved.
  */
 final class SettingsPage implements HookRegistrar {
 
@@ -41,11 +45,9 @@ final class SettingsPage implements HookRegistrar {
 	private const CHECK_NONCE = 'wso_smart_order_check';
 
 	/**
-	 * Sets up the screen.
-	 *
-	 * @param ConnectionTester $tester Live credential checks.
+	 * Name of the option array posted by the form.
 	 */
-	public function __construct( private readonly ConnectionTester $tester ) {}
+	private const FIELD = Settings::OPTION;
 
 	/**
 	 * Attaches the admin hooks.
@@ -73,13 +75,10 @@ final class SettingsPage implements HookRegistrar {
 	 * Adds the submenu entry under WooCommerce.
 	 */
 	public function addMenu(): void {
-		$page_title = __( 'Smart Order', 'woocommerce-smart-order' );
-		$menu_title = __( 'Smart Order', 'woocommerce-smart-order' );
-
 		add_submenu_page(
 			'woocommerce',
-			$page_title,
-			$menu_title,
+			__( 'Smart Order', 'woocommerce-smart-order' ),
+			__( 'Smart Order', 'woocommerce-smart-order' ),
 			self::CAPABILITY,
 			self::SLUG,
 			array( $this, 'render' )
@@ -111,6 +110,7 @@ final class SettingsPage implements HookRegistrar {
 				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 				'action'  => self::CHECK_ACTION,
 				'nonce'   => wp_create_nonce( self::CHECK_NONCE ),
+				'field'   => self::FIELD,
 				'strings' => array(
 					'checking' => __( 'Checking…', 'woocommerce-smart-order' ),
 					'failed'   => __( 'The check request failed.', 'woocommerce-smart-order' ),
@@ -127,7 +127,7 @@ final class SettingsPage implements HookRegistrar {
 	}
 
 	/**
-	 * Runs one live credential check and answers the admin script.
+	 * Runs one live credential check against the submitted form and answers the script.
 	 */
 	public function handleCheck(): void {
 		check_ajax_referer( self::CHECK_NONCE, 'nonce' );
@@ -150,12 +150,34 @@ final class SettingsPage implements HookRegistrar {
 			);
 		}
 
-		// An unsaved value wins, so a key can be tested before it is stored.
-		$value = isset( $_POST['value'] ) && is_string( $_POST['value'] ) ? sanitize_text_field( wp_unslash( $_POST['value'] ) ) : '';
+		// The whole form travels with the request: the check must describe what the
+		// screen shows, not what was last saved. Read here so the nonce above covers it.
+		$raw = isset( $_POST[ self::FIELD ] ) && is_array( $_POST[ self::FIELD ] )
+			? wp_unslash( $_POST[ self::FIELD ] ) // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitized per value in toScalars().
+			: array();
 
-		$result = 'telegram' === $target ? $this->tester->checkTelegram( $value ) : $this->tester->checkAi( $value );
+		$draft  = Draft::fromInput( $this->toScalars( $raw ) );
+		$tester = new ConnectionTester();
 
-		$this->sendResult( $result );
+		$this->sendResult( 'telegram' === $target ? $tester->checkTelegram( $draft ) : $tester->checkAi( $draft ) );
+	}
+
+	/**
+	 * Narrows a submitted option array to scalar strings.
+	 *
+	 * @param array<mixed> $raw Unslashed request data.
+	 * @return array<string, string>
+	 */
+	private function toScalars( array $raw ): array {
+		$clean = array();
+
+		foreach ( $raw as $key => $value ) {
+			if ( is_scalar( $value ) ) {
+				$clean[ (string) $key ] = sanitize_text_field( (string) $value );
+			}
+		}
+
+		return $clean;
 	}
 
 	/**
@@ -182,17 +204,31 @@ final class SettingsPage implements HookRegistrar {
 		$this->addField(
 			'enabled',
 			__( 'Enable processing', 'woocommerce-smart-order' ),
-			'checkbox',
-			__( 'Turn this off when another chain already notifies the manager — for example the n8n workflow this plugin ships with. Two chains mean two messages per order.', 'woocommerce-smart-order' )
+			'checkbox'
 		);
-		$this->addField( 'provider', __( 'AI provider', 'woocommerce-smart-order' ), 'select' );
+		$this->addField(
+			'provider',
+			__( 'AI provider', 'woocommerce-smart-order' ),
+			'select',
+			__( 'Each provider keeps its own API key, so switching providers never sends one service’s key to another.', 'woocommerce-smart-order' )
+		);
+		$this->addField(
+			'base_url',
+			__( 'Custom base URL', 'woocommerce-smart-order' ),
+			'text',
+			__( 'Used only by the “Custom endpoint” provider, e.g. https://openrouter.ai/api/v1 or http://localhost:11434/v1. Must start with http:// or https://.', 'woocommerce-smart-order' )
+		);
 		$this->addField(
 			'model',
 			__( 'Model', 'woocommerce-smart-order' ),
 			'text',
-			__( 'Must be a model the selected provider serves, e.g. gpt-4o-mini or claude-3-5-haiku-latest.', 'woocommerce-smart-order' )
+			__( 'Any model the endpoint serves: gemini-2.5-flash, gpt-4o-mini, claude-3-5-haiku-latest, llama3.2. A name that is not the current provider’s default is passed through as-is.', 'woocommerce-smart-order' )
 		);
-		$this->addField( 'notify_mode', __( 'Notification transport', 'woocommerce-smart-order' ), 'select_notify' );
+		$this->addField(
+			'notify_mode',
+			__( 'Notification transport', 'woocommerce-smart-order' ),
+			'select_notify'
+		);
 		$this->addField(
 			'telegram_chat',
 			__( 'Telegram group id', 'woocommerce-smart-order' ),
@@ -201,9 +237,9 @@ final class SettingsPage implements HookRegistrar {
 		);
 		$this->addField(
 			'api_key',
-			__( 'API key', 'woocommerce-smart-order' ),
+			__( 'AI API key', 'woocommerce-smart-order' ),
 			'password',
-			__( 'Stored in the database. A WSO_OPENAI_API_KEY or WSO_ANTHROPIC_API_KEY constant in wp-config.php takes priority.', 'woocommerce-smart-order' )
+			__( 'Stored per provider. A wp-config.php constant — WSO_OPENAI_API_KEY, WSO_ANTHROPIC_API_KEY or WSO_AI_API_KEY — takes priority when defined.', 'woocommerce-smart-order' )
 		);
 		$this->addField(
 			'telegram_token',
@@ -230,17 +266,32 @@ final class SettingsPage implements HookRegistrar {
 		$input   = is_array( $input ) ? $input : array();
 		$current = Settings::all();
 
-		$provider = isset( $input['provider'] ) && is_scalar( $input['provider'] )
-			? (string) $input['provider']
-			: '';
+		$provider = Settings::normalizeProvider(
+			isset( $input['provider'] ) && is_scalar( $input['provider'] )
+				? (string) $input['provider']
+				: (string) ( $current['provider'] ?? '' )
+		);
 
 		$notify_mode = isset( $input['notify_mode'] ) && is_scalar( $input['notify_mode'] )
 			? (string) $input['notify_mode']
 			: '';
 
-		$api_key = isset( $input['api_key'] ) && is_scalar( $input['api_key'] )
-			? trim( (string) $input['api_key'] )
+		$raw_base = isset( $input['base_url'] ) && is_scalar( $input['base_url'] )
+			? trim( (string) $input['base_url'] )
 			: '';
+
+		$base_url = Url::normalizeBaseUrl( $raw_base );
+		if ( '' !== $raw_base && '' === $base_url ) {
+			add_settings_error(
+				Settings::OPTION,
+				'wso_base_url_invalid',
+				sprintf(
+					/* translators: %s: the rejected value, truncated. */
+					__( 'The custom base URL was discarded: “%s” is not an http:// or https:// address.', 'woocommerce-smart-order' ),
+					mb_substr( $raw_base, 0, 40 )
+				)
+			);
+		}
 
 		$telegram_token = isset( $input['telegram_token'] ) && is_scalar( $input['telegram_token'] )
 			? trim( (string) $input['telegram_token'] )
@@ -250,28 +301,45 @@ final class SettingsPage implements HookRegistrar {
 			? trim( (string) $input['telegram_chat'] )
 			: '';
 
+		$typed_key = isset( $input['api_key'] ) && is_scalar( $input['api_key'] )
+			? trim( (string) $input['api_key'] )
+			: '';
+
+		$keys = is_array( $current['api_keys'] ?? null ) ? $current['api_keys'] : array();
+
+		if ( ! empty( $input['api_key_clear'] ) ) {
+			unset( $keys[ $provider ] );
+		} elseif ( '' !== $typed_key ) {
+			$keys[ $provider ] = sanitize_text_field( $typed_key );
+		}
+
 		$clean = array(
 			'enabled'        => ! empty( $input['enabled'] ),
-			'provider'       => in_array( $provider, array( Settings::PROVIDER_OPENAI, Settings::PROVIDER_ANTHROPIC ), true )
-				? $provider
-				: Settings::PROVIDER_OPENAI,
+			'provider'       => $provider,
+			'base_url'       => $base_url,
 			'model'          => sanitize_text_field( (string) ( $input['model'] ?? '' ) ),
 			'notify_mode'    => Settings::MODE_TELEGRAM === $notify_mode
 				? Settings::MODE_TELEGRAM
 				: Settings::MODE_LOG,
-			// A Telegram chat is a numeric id (negative for groups) or a public @username.
 			'telegram_chat'  => $this->sanitizeChatId( $telegram_chat ),
-			// Empty means "keep what is stored" — the field is never prefilled.
-			'api_key'        => '' !== $api_key
-				? sanitize_text_field( $api_key )
-				: (string) ( $current['api_key'] ?? '' ),
+			'api_keys'       => array_filter( $keys, static fn ( $value ): bool => is_scalar( $value ) && '' !== trim( (string) $value ) ),
 			'telegram_token' => '' !== $telegram_token
 				? sanitize_text_field( $telegram_token )
 				: (string) ( $current['telegram_token'] ?? '' ),
 		);
 
-		if ( ! array_key_exists( 'model', $input ) && array_key_exists( 'model', $current ) ) {
+		if ( ! array_key_exists( 'model', $input ) && is_scalar( $current['model'] ?? null ) ) {
 			$clean['model'] = (string) $current['model'];
+		}
+
+		// Silence here would look like a working setup that never delivers.
+		if ( Settings::MODE_TELEGRAM === $clean['notify_mode'] && '' === $clean['telegram_chat'] ) {
+			add_settings_error(
+				Settings::OPTION,
+				'wso_telegram_chat_missing',
+				__( 'Telegram is selected but the group id is empty, so messages will be written to the log instead of sent. Add the bot to a group and paste its id.', 'woocommerce-smart-order' ),
+				'warning'
+			);
 		}
 
 		return $clean;
@@ -302,9 +370,11 @@ final class SettingsPage implements HookRegistrar {
 			return;
 		}
 
-		$title = esc_html__( 'Smart Order', 'woocommerce-smart-order' );
+		echo '<div class="wrap"><h1>' . esc_html__( 'Smart Order', 'woocommerce-smart-order' ) . '</h1>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped above.
 
-		echo '<div class="wrap"><h1>' . $title . '</h1>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped above.
+		// Without this, a rejected value disappears without a word.
+		settings_errors( Settings::OPTION );
+
 		echo '<form method="post" action="options.php">';
 
 		settings_fields( self::SLUG );
@@ -343,22 +413,24 @@ final class SettingsPage implements HookRegistrar {
 	 */
 	private function buildControl( string $key, string $type, string $description = '' ): string {
 		$settings = Settings::all();
-		$name     = sprintf( '%s[%s]', Settings::OPTION, $key );
+		$name     = sprintf( '%s[%s]', self::FIELD, $key );
 		$current  = $settings[ $key ] ?? '';
 		$markup   = '';
 
 		switch ( $type ) {
 			case 'checkbox':
-				$markup = $this->checkbox( $name, (bool) $current );
+				$markup = $this->checkbox( $name, (bool) $current, __( 'Run the pipeline for every new order', 'woocommerce-smart-order' ) );
 				break;
 
 			case 'select':
 				$markup = $this->select(
 					$name,
-					(string) $current,
+					Settings::provider(),
 					array(
 						Settings::PROVIDER_OPENAI    => 'OpenAI',
 						Settings::PROVIDER_ANTHROPIC => 'Anthropic',
+						Settings::PROVIDER_GEMINI    => __( 'Google Gemini', 'woocommerce-smart-order' ),
+						Settings::PROVIDER_CUSTOM    => __( 'Custom endpoint (OpenAI-compatible)', 'woocommerce-smart-order' ),
 					)
 				);
 				break;
@@ -394,16 +466,15 @@ final class SettingsPage implements HookRegistrar {
 	}
 
 	/**
-	 * Builds a secret field: an empty input, where the value currently comes from,
-	 * and a button that runs a live check.
+	 * Builds a secret field: an empty input, where the values come from, and a
+	 * button that runs a live check against the whole form.
 	 *
 	 * @param string $name        Field name.
 	 * @param string $key         Option key.
-	 * @param string $description Help text shown under the input.
+	 * @param string $description Help text.
 	 */
 	private function secret( string $name, string $key, string $description ): string {
 		$is_ai    = 'api_key' === $key;
-		$source   = $is_ai ? Settings::apiKeySource() : Settings::telegramTokenSource();
 		$target   = $is_ai ? 'ai' : 'telegram';
 		$field_id = 'wso-' . str_replace( '_', '-', $key );
 
@@ -411,13 +482,12 @@ final class SettingsPage implements HookRegistrar {
 			'<input type="password" id="%s" name="%s" value="" autocomplete="new-password" class="regular-text" placeholder="%s">',
 			esc_attr( $field_id ),
 			esc_attr( $name ),
-			esc_attr__( 'leave empty to keep the stored value', 'woocommerce-smart-order' )
+			esc_attr__( 'paste a new value to replace the stored one', 'woocommerce-smart-order' )
 		);
 
 		$button = sprintf(
-			'<button type="button" class="button wso-check" data-target="%s" data-field="%s">%s</button>',
+			'<button type="button" class="button wso-check" data-target="%s">%s</button>',
 			esc_attr( $target ),
-			esc_attr( $field_id ),
 			esc_html__( 'Test connection', 'woocommerce-smart-order' )
 		);
 
@@ -426,36 +496,53 @@ final class SettingsPage implements HookRegistrar {
 			esc_attr( $target )
 		);
 
-		return $input . $this->hint( $this->sourceText( $source ), $description ) . '<p>' . $button . ' ' . $output . '</p>';
+		$clear = $is_ai
+			? sprintf(
+				'<p><label><input type="checkbox" name="%s" value="1"> %s</label></p>',
+				esc_attr( sprintf( '%s[api_key_clear]', self::FIELD ) ),
+				esc_html__( 'Remove the stored key for the selected provider', 'woocommerce-smart-order' )
+			)
+			: '';
+
+		return $input . ( $is_ai ? $this->keyStatus() : '' ) . $this->hint( $description ) . $clear . '<p>' . $button . ' ' . $output . '</p>';
 	}
 
 	/**
-	 * Renders one hint paragraph: where the secret comes from, then the help text.
+	 * Lists which providers already hold a key.
 	 *
-	 * @param string $source Where the effective value comes from.
-	 * @param string $help   Optional help text.
+	 * Rendered as a list rather than "the current one" because the provider select can
+	 * change before the page is saved.
 	 */
-	private function hint( string $source, string $help ): string {
-		$text = '' !== $help ? $source . ' ' . $help : $source;
+	private function keyStatus(): string {
+		$rows = array();
 
+		foreach ( Settings::providers() as $provider ) {
+			$source = Settings::apiKeySourceFor( $provider );
+			$label  = \WSO\SmartOrder\Ai\KeyPrefix::label( $provider );
+
+			$status = match ( $source ) {
+				Settings::SOURCE_CONSTANT => __( 'set in wp-config.php', 'woocommerce-smart-order' ),
+				Settings::SOURCE_STORED   => __( 'saved in the database', 'woocommerce-smart-order' ),
+				default                   => __( 'not set', 'woocommerce-smart-order' ),
+			};
+
+			$rows[] = esc_html( sprintf( '%s: %s', $label, $status ) );
+		}
+
+		return '<p class="description">' . implode( ' · ', $rows ) . '</p>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- each row escaped above.
+	}
+
+	/**
+	 * Renders optional help text below a control.
+	 *
+	 * @param string $text Help text.
+	 */
+	private function hint( string $text ): string {
 		if ( '' === $text ) {
 			return '';
 		}
 
 		return '<p class="description">' . esc_html( $text ) . '</p>';
-	}
-
-	/**
-	 * Describes where the effective secret comes from.
-	 *
-	 * @param string $source One of the Settings::SOURCE_* values.
-	 */
-	private function sourceText( string $source ): string {
-		return match ( $source ) {
-			Settings::SOURCE_CONSTANT => __( 'Currently: set in wp-config.php — the stored value is ignored.', 'woocommerce-smart-order' ),
-			Settings::SOURCE_STORED   => __( 'Currently: saved in the database.', 'woocommerce-smart-order' ),
-			default                   => __( 'Currently: not set.', 'woocommerce-smart-order' ),
-		};
 	}
 
 	/**
@@ -478,16 +565,16 @@ final class SettingsPage implements HookRegistrar {
 	 *
 	 * @param string $name    Field name.
 	 * @param bool   $checked Current state.
+	 * @param string $label   Label text.
 	 */
-	private function checkbox( string $name, bool $checked ): string {
+	private function checkbox( string $name, bool $checked, string $label ): string {
 		$checked_attribute = $checked ? ' checked="checked"' : '';
-		$label             = esc_html__( 'Run the pipeline for every new order', 'woocommerce-smart-order' );
 
 		return sprintf(
 			'<label><input type="checkbox" name="%s" value="1"%s> %s</label>',
 			esc_attr( $name ),
 			$checked_attribute,
-			$label
+			esc_html( $label )
 		);
 	}
 

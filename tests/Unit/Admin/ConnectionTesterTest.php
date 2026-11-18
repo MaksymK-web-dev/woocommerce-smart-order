@@ -11,10 +11,14 @@ namespace WSO\SmartOrder\Tests\Unit\Admin;
 
 use PHPUnit\Framework\TestCase;
 use WSO\SmartOrder\Admin\ConnectionTester;
+use WSO\SmartOrder\Config\Draft;
 use WSO\SmartOrder\Config\Settings;
 
 /**
  * Pins what the admin sees for each kind of answer a provider can give.
+ *
+ * Every case builds a draft, which is what the screen submits: the tester must never
+ * fall back to the stored configuration on its own.
  */
 final class ConnectionTesterTest extends TestCase {
 
@@ -30,12 +34,12 @@ final class ConnectionTesterTest extends TestCase {
 	}
 
 	/**
-	 * Stores plugin settings.
+	 * Builds the draft a submitted form would produce.
 	 *
-	 * @param array<string, mixed> $values Settings.
+	 * @param array<string, string> $input Form values.
 	 */
-	private static function configure( array $values ): void {
-		$GLOBALS['wso_test_options'][ Settings::OPTION ] = $values;
+	private static function draft( array $input ): Draft {
+		return Draft::fromInput( $input );
 	}
 
 	/**
@@ -73,9 +77,7 @@ final class ConnectionTesterTest extends TestCase {
 	 * A missing key must be reported without touching the network.
 	 */
 	public function testAiWithoutKeyNeverCallsTheProvider(): void {
-		self::configure( array( 'provider' => Settings::PROVIDER_OPENAI ) );
-
-		$result = ( new ConnectionTester() )->checkAi();
+		$result = ( new ConnectionTester() )->checkAi( self::draft( array( 'provider' => Settings::PROVIDER_OPENAI ) ) );
 
 		self::assertFalse( $result->ok );
 		self::assertStringContainsString( 'No API key', $result->message );
@@ -83,94 +85,200 @@ final class ConnectionTesterTest extends TestCase {
 	}
 
 	/**
-	 * A stored key reaches OpenAI and a 200 is a pass.
+	 * A typed key is used for the check, before anything is saved.
 	 */
-	public function testAiAcceptsAWorkingKey(): void {
-		self::configure(
-			array(
-				'provider' => Settings::PROVIDER_OPENAI,
-				'api_key'  => 'sk-test',
-			)
-		);
-		self::respond( 200, array( 'data' => array( array( 'id' => 'gpt-4o-mini' ) ) ) );
-
-		$result = ( new ConnectionTester() )->checkAi();
-
-		self::assertTrue( $result->ok, $result->message );
-		self::assertStringContainsString( 'OpenAI', $result->message );
-		self::assertCount( 1, self::requests() );
-		self::assertStringContainsString( 'api.openai.com', self::requests()[0] );
-	}
-
-	/**
-	 * A key typed into the form wins over the stored one.
-	 */
-	public function testAnUnsavedKeyIsUsedForTheCheck(): void {
-		self::configure(
-			array(
-				'provider' => Settings::PROVIDER_OPENAI,
-				'api_key'  => 'sk-stored',
-			)
-		);
+	public function testTypedKeyIsCheckedBeforeSaving(): void {
 		self::respond( 200, array( 'data' => array() ) );
 
-		$result = ( new ConnectionTester() )->checkAi( 'sk-typed' );
+		$result = ( new ConnectionTester() )->checkAi(
+			self::draft(
+				array(
+					'provider' => Settings::PROVIDER_OPENAI,
+					'api_key'  => 'sk-typed',
+				)
+			)
+		);
 
 		self::assertTrue( $result->ok, $result->message );
+		self::assertStringContainsString( 'api.openai.com', self::requests()[0] );
+		self::assertSame( array(), $GLOBALS['wso_test_options'], 'the check must not write the option' );
 	}
 
 	/**
-	 * The provider's own wording is what the admin needs to see.
+	 * The provider chosen in the form decides the endpoint, not the stored one.
 	 */
-	public function testProviderErrorMessageIsSurfaced(): void {
-		self::configure(
-			array(
-				'provider' => Settings::PROVIDER_OPENAI,
-				'api_key'  => 'sk-revoked',
+	public function testProviderFromTheFormDecidesTheEndpoint(): void {
+		$GLOBALS['wso_test_options'][ Settings::OPTION ] = array( 'provider' => Settings::PROVIDER_OPENAI );
+		self::respond( 200, array( 'data' => array() ) );
+
+		$result = ( new ConnectionTester() )->checkAi(
+			self::draft(
+				array(
+					'provider' => Settings::PROVIDER_GEMINI,
+					'api_key'  => 'AIzaSyTEST',
+				)
 			)
 		);
-		self::respond(
-			401,
-			array( 'error' => array( 'message' => 'Incorrect API key provided: sk-revoked.' ) )
-		);
 
-		$result = ( new ConnectionTester() )->checkAi();
+		self::assertTrue( $result->ok, $result->message );
+		self::assertStringContainsString( 'generativelanguage.googleapis.com', self::requests()[0] );
+	}
+
+	/**
+	 * A Google key with the OpenAI provider is named as such, without a wasted request.
+	 */
+	public function testKeyBelongingToAnotherServiceIsNamed(): void {
+		$result = ( new ConnectionTester() )->checkAi(
+			self::draft(
+				array(
+					'provider' => Settings::PROVIDER_OPENAI,
+					'api_key'  => 'AIza' . 'SyTEST',
+				)
+			)
+		);
 
 		self::assertFalse( $result->ok );
-		self::assertStringContainsString( 'Incorrect API key provided', $result->message );
+		self::assertStringContainsString( 'Google Gemini', $result->message );
+		self::assertStringContainsString( 'OpenAI', $result->message );
+		self::assertSame( array(), self::requests(), 'a mismatch must not reach either API' );
 	}
 
 	/**
-	 * The Anthropic branch must not call the OpenAI endpoint.
+	 * The matching key is sent to its own provider.
 	 */
-	public function testAnthropicUsesItsOwnEndpoint(): void {
-		self::configure(
-			array(
-				'provider' => Settings::PROVIDER_ANTHROPIC,
-				'api_key'  => 'sk-ant-test',
-			)
-		);
+	public function testMatchingKeyIsAccepted(): void {
 		self::respond( 200, array( 'data' => array() ) );
 
-		$result = ( new ConnectionTester() )->checkAi();
+		$result = ( new ConnectionTester() )->checkAi(
+			self::draft(
+				array(
+					'provider' => Settings::PROVIDER_GEMINI,
+					'api_key'  => 'AIzaSyTEST',
+				)
+			)
+		);
+
+		self::assertTrue( $result->ok, $result->message );
+		self::assertStringContainsString( 'Google Gemini', $result->message );
+	}
+
+	/**
+	 * The Anthropic prefix must not be mistaken for an OpenAI one.
+	 */
+	public function testAnthropicKeyIsNotReadAsOpenAi(): void {
+		self::respond( 200, array( 'data' => array() ) );
+
+		$result = ( new ConnectionTester() )->checkAi(
+			self::draft(
+				array(
+					'provider' => Settings::PROVIDER_ANTHROPIC,
+					'api_key'  => 'sk-' . 'ant-' . 'api03TEST',
+				)
+			)
+		);
 
 		self::assertTrue( $result->ok, $result->message );
 		self::assertStringContainsString( 'anthropic.com', self::requests()[0] );
 	}
 
 	/**
+	 * A custom endpoint may hold any key format, so nothing is inferred.
+	 */
+	public function testCustomEndpointAcceptsAnyKeyFormat(): void {
+		self::respond( 200, array( 'data' => array() ) );
+
+		$result = ( new ConnectionTester() )->checkAi(
+			self::draft(
+				array(
+					'provider' => Settings::PROVIDER_CUSTOM,
+					'base_url' => 'https://openrouter.ai/api/v1',
+					'api_key'  => 'sk-' . 'or-v1-TEST',
+				)
+			)
+		);
+
+		self::assertTrue( $result->ok, $result->message );
+		self::assertStringContainsString( 'openrouter.ai', self::requests()[0] );
+	}
+
+	/**
+	 * A custom provider without a URL cannot be checked, and says why.
+	 */
+	public function testCustomEndpointWithoutUrlIsRefused(): void {
+		$result = ( new ConnectionTester() )->checkAi(
+			self::draft(
+				array(
+					'provider' => Settings::PROVIDER_CUSTOM,
+					'base_url' => '',
+					'api_key'  => 'sk-' . 'TEST',
+				)
+			)
+		);
+
+		self::assertFalse( $result->ok );
+		self::assertStringContainsString( 'needs a base URL', $result->message );
+		self::assertSame( array(), self::requests() );
+	}
+
+	/**
+	 * The provider's own wording is what the admin needs to see.
+	 */
+	public function testProviderErrorMessageIsSurfaced(): void {
+		self::respond(
+			401,
+			array( 'error' => array( 'message' => 'Incorrect API key provided.' ) )
+		);
+
+		$result = ( new ConnectionTester() )->checkAi(
+			self::draft(
+				array(
+					'provider' => Settings::PROVIDER_OPENAI,
+					'api_key'  => 'sk-bad',
+				)
+			)
+		);
+
+		self::assertFalse( $result->ok );
+		self::assertStringContainsString( 'Incorrect API key provided', $result->message );
+	}
+
+	/**
+	 * A wrong model is named, because "HTTP 404" says nothing actionable.
+	 */
+	public function testUnknownModelIsNamed(): void {
+		// A missing listing falls through to a one-token probe; that probe is what
+		// reports the model name.
+		self::respond( 404, array( 'error' => array( 'message' => 'model not found' ) ) );
+		self::respond( 404, array( 'error' => array( 'message' => 'model not found' ) ) );
+
+		$result = ( new ConnectionTester() )->checkAi(
+			self::draft(
+				array(
+					'provider' => Settings::PROVIDER_GEMINI,
+					'api_key'  => 'AIzaSyTEST',
+					'model'    => 'gemini-9.9-imaginary',
+				)
+			)
+		);
+
+		self::assertFalse( $result->ok );
+		self::assertStringContainsString( 'gemini-9.9-imaginary', $result->message );
+	}
+
+	/**
 	 * A transport failure is a failure, not a silently empty success.
 	 */
 	public function testTransportErrorIsReported(): void {
-		self::configure(
-			array(
-				'provider' => Settings::PROVIDER_OPENAI,
-				'api_key'  => 'sk-test',
-			)
-		);
 		self::respondWithError( 'cURL error 7: Failed to connect' );
 
-		$result = ( new ConnectionTester() )->checkAi();
+		$result = ( new ConnectionTester() )->checkAi(
+			self::draft(
+				array(
+					'provider' => Settings::PROVIDER_OPENAI,
+					'api_key'  => 'sk-test',
+				)
+			)
+		);
 
 		self::assertFalse( $result->ok );
 		self::assertStringContainsString( 'curl', strtolower( $result->message ) );
@@ -180,7 +288,7 @@ final class ConnectionTesterTest extends TestCase {
 	 * Telegram without a token never leaves the site.
 	 */
 	public function testTelegramWithoutTokenNeverCallsTheApi(): void {
-		$result = ( new ConnectionTester() )->checkTelegram();
+		$result = ( new ConnectionTester() )->checkTelegram( self::draft( array() ) );
 
 		self::assertFalse( $result->ok );
 		self::assertStringContainsString( 'No bot token', $result->message );
@@ -191,7 +299,6 @@ final class ConnectionTesterTest extends TestCase {
 	 * A rejected token reports Telegram's description.
 	 */
 	public function testTelegramRejectsABadToken(): void {
-		self::configure( array( 'telegram_token' => '123:bad' ) );
 		self::respond(
 			401,
 			array(
@@ -200,7 +307,7 @@ final class ConnectionTesterTest extends TestCase {
 			)
 		);
 
-		$result = ( new ConnectionTester() )->checkTelegram();
+		$result = ( new ConnectionTester() )->checkTelegram( self::draft( array( 'telegram_token' => '123:bad' ) ) );
 
 		self::assertFalse( $result->ok );
 		self::assertStringContainsString( 'Unauthorized', $result->message );
@@ -210,7 +317,6 @@ final class ConnectionTesterTest extends TestCase {
 	 * A valid token with no group id stops after the identity call.
 	 */
 	public function testTelegramTokenOnlyIdentifiesTheBot(): void {
-		self::configure( array( 'telegram_token' => '123:good' ) );
 		self::respond(
 			200,
 			array(
@@ -219,7 +325,7 @@ final class ConnectionTesterTest extends TestCase {
 			)
 		);
 
-		$result = ( new ConnectionTester() )->checkTelegram();
+		$result = ( new ConnectionTester() )->checkTelegram( self::draft( array( 'telegram_token' => '123:good' ) ) );
 
 		self::assertTrue( $result->ok, $result->message );
 		self::assertStringContainsString( 'wso_orders_bot', $result->message );
@@ -230,12 +336,6 @@ final class ConnectionTesterTest extends TestCase {
 	 * Token plus group id checks the group and names it.
 	 */
 	public function testTelegramConfirmsTheGroupIsReachable(): void {
-		self::configure(
-			array(
-				'telegram_token' => '123:good',
-				'telegram_chat'  => '-1001234567890',
-			)
-		);
 		self::respond(
 			200,
 			array(
@@ -251,7 +351,14 @@ final class ConnectionTesterTest extends TestCase {
 			)
 		);
 
-		$result = ( new ConnectionTester() )->checkTelegram();
+		$result = ( new ConnectionTester() )->checkTelegram(
+			self::draft(
+				array(
+					'telegram_token' => '123:good',
+					'telegram_chat'  => '-1001234567890',
+				)
+			)
+		);
 
 		self::assertTrue( $result->ok, $result->message );
 		self::assertStringContainsString( 'Orders', $result->message );
@@ -264,12 +371,6 @@ final class ConnectionTesterTest extends TestCase {
 	 * A token that works but a group the bot cannot see is a distinct failure.
 	 */
 	public function testTelegramReportsAnUnreachableGroup(): void {
-		self::configure(
-			array(
-				'telegram_token' => '123:good',
-				'telegram_chat'  => '-100999',
-			)
-		);
 		self::respond(
 			200,
 			array(
@@ -285,9 +386,49 @@ final class ConnectionTesterTest extends TestCase {
 			)
 		);
 
-		$result = ( new ConnectionTester() )->checkTelegram();
+		$result = ( new ConnectionTester() )->checkTelegram(
+			self::draft(
+				array(
+					'telegram_token' => '123:good',
+					'telegram_chat'  => '-100999',
+				)
+			)
+		);
 
 		self::assertFalse( $result->ok );
 		self::assertStringContainsString( 'chat not found', $result->message );
+	}
+
+	/**
+	 * A group id typed into the form is checked without saving it first.
+	 */
+	public function testChatIdFromTheFormIsUsed(): void {
+		self::respond(
+			200,
+			array(
+				'ok'     => true,
+				'result' => array( 'username' => 'wso_orders_bot' ),
+			)
+		);
+		self::respond(
+			200,
+			array(
+				'ok'     => true,
+				'result' => array( 'title' => 'Typed Group' ),
+			)
+		);
+
+		$result = ( new ConnectionTester() )->checkTelegram(
+			self::draft(
+				array(
+					'telegram_token' => '123:good',
+					'telegram_chat'  => '-100777',
+				)
+			)
+		);
+
+		self::assertTrue( $result->ok, $result->message );
+		self::assertStringContainsString( '-100777', self::requests()[1] );
+		self::assertSame( array(), $GLOBALS['wso_test_options'], 'the check must not write the option' );
 	}
 }

@@ -3,7 +3,7 @@
  * Plugin Name: WSO — Local Webhook Transport
  * Description: Grants wp_safe_remote_request() access to a local n8n instance (127.0.0.1:5678).
  * Version:     1.0.0
- * Requires PHP: 7.4
+ * Requires PHP: 8.1
  *
  * Installed as a must-use plugin. Local development only.
  *
@@ -81,6 +81,12 @@ final class LocalWebhookTransport {
 			return $ports;
 		}
 
+		// The port list is consulted on its own, so the host is checked here too rather
+		// than relying on the other filter.
+		if ( ! in_array( strtolower( $host ), self::LOCAL_HOSTS, true ) ) {
+			return $ports;
+		}
+
 		if ( ! in_array( self::PORT, $ports, true ) ) {
 			$ports[] = self::PORT;
 		}
@@ -91,11 +97,24 @@ final class LocalWebhookTransport {
 	/**
 	 * Whether the URL points at an n8n webhook trigger on the n8n port.
 	 *
+	 * The port has to be the authority's, not something later in the path or query, so
+	 * the marker is matched against the parsed URL instead of the raw string.
+	 *
 	 * @param string $url Requested URL.
 	 * @return bool
 	 */
 	private static function isN8nWebhook( string $url ): bool {
-		return false !== strpos( $url, ':' . self::PORT . self::PATH_MARKER );
+		$parts = wp_parse_url( $url );
+
+		if ( ! is_array( $parts ) ) {
+			return false;
+		}
+
+		if ( self::PORT !== (int) ( $parts['port'] ?? 0 ) ) {
+			return false;
+		}
+
+		return str_starts_with( (string) ( $parts['path'] ?? '' ), self::PATH_MARKER );
 	}
 
 	/**
